@@ -1,0 +1,80 @@
+/* ==========================================
+   File: src/index.css
+   Purpose: Million-Dollar Startup Global Styles
+========================================== */
+
+/* 1. Reset & Typography */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Poppins', sans-serif; /* The premium font! */
+}
+
+body {
+  background-color: #F9FAFB; /* Soft, clean off-white */
+  color: #111827; /* Near-black for softer reading */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 2. Premium Shadows & Cards */
+.glass-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 215, 0, 0.3); /* Subtle yellow hint */
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-5px); /* Floats up slightly on hover */
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* 3. The "Kidza Gold" Primary Button */
+.btn-primary {
+  background: linear-gradient(135deg, #FFD700 0%, #F5B041 100%);
+  color: #000000;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(255, 215, 0, 0.4);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(255, 215, 0, 0.5);
+  filter: brightness(1.05);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+/* 4. Modern Input Fields */
+.input-modern {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  background-color: #F9FAFB;
+  transition: all 0.2s ease;
+  font-size: 15px;
+}
+
+.input-modern:focus {
+  outline: none;
+  border-color: #FFD700;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.1);
+}
+
+/* Smooth scrolling for the whole app */
+html {
+  scroll-behavior: smooth;
+}
+
+
