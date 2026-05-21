@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const overlayStyle = {
   position: 'fixed', inset: 0, backgroundColor: 'rgba(17,24,39,0.55)',
@@ -16,21 +16,17 @@ const modalStyle = {
 const fieldStyle = { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '15px' };
 const labelStyle = { fontSize: '0.8rem', fontWeight: '700', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.03em' };
 
+// Parent should pass `key={user?._id}` so this component remounts with fresh
+// state whenever a different user is selected. That keeps state initialization
+// in useState() and avoids prop-syncing inside a useEffect.
 const EditUserModal = ({ user, onClose, onSave, saving }) => {
-  const [form, setForm] = useState({ username: '', email: '', phone: '', role: 'customer' });
+  const [form, setForm] = useState(() => ({
+    username: user?.username || '',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    role: user?.role || 'customer'
+  }));
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (user) {
-      setForm({
-        username: user.username || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        role: user.role || 'customer'
-      });
-      setError('');
-    }
-  }, [user]);
 
   if (!user) return null;
 

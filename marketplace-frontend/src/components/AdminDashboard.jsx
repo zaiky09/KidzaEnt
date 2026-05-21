@@ -260,6 +260,7 @@ const AdminDashboard = () => {
       )}
 
       <EditUserModal
+        key={editingUser?._id || 'closed'}
         user={editingUser}
         saving={savingUser}
         onClose={() => setEditingUser(null)}

@@ -14,7 +14,7 @@ const DriverProfileForm = ({ onProfileSubmit }) => {
       try {
         const res = await api.get('/api/users/me');
         if (res.data.driverDetails) setFormData(res.data.driverDetails);
-      } catch (err) { console.log("New user, no profile found."); }
+      } catch { console.log("New user, no profile found."); }
     };
     fetchExistingData();
   }, []);

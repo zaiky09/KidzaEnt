@@ -8,7 +8,7 @@ const CatalogPage = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const { addToCart } = useContext(CartContext);
   const [addedItemId, setAddedItemId] = useState(null);
   const [quantities, setQuantities] = useState({});
@@ -98,7 +98,7 @@ const CatalogPage = () => {
         setAiResults([]);
         setSearchMessage('🤖 No matches found. Try rephrasing!');
       }
-    } catch (error) {
+    } catch {
       setSearchMessage('❌ AI Search failed.');
     } finally {
       setIsSearching(false);

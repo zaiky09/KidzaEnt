@@ -20,6 +20,9 @@ const ProtectedRoute = ({ children, allow }) => {
   const token = localStorage.getItem('token');
   const payload = token ? decodeJwtPayload(token) : null;
 
+  // Intentionally impure: a route guard should re-evaluate freshness on every
+  // render so tokens that expire mid-session redirect to login.
+  // eslint-disable-next-line react-hooks/purity
   const isExpired = payload?.exp && payload.exp * 1000 < Date.now();
   if (!token || !payload || isExpired) {
     if (isExpired) {
