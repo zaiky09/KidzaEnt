@@ -17,8 +17,8 @@ const verifyToken = (req, res, next) => {
         //We split it to just get the token string itself
         const tokenString = token.startsWith('Bearer ') ? token.split(' ')[1] : token;
 
-        //Verify the token using the secret key we defined in the .env file (fallback to default so tokens created without an env var still work)
-        const verified = jwt.verify(tokenString, process.env.JWT_SECRET || 'supersecretkey');
+        //Verify the token using the secret key we defined in the .env file
+        const verified = jwt.verify(tokenString, process.env.JWT_SECRET);
 
         //Attach the user information (userId, role) to the request
         req.user = verified;

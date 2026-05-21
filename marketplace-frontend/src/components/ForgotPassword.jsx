@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -8,11 +8,12 @@ const ForgotPassword = () => {
   const handleReset = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/auth/forgot-password', { email });
-      setMessage('✅ Reset link sent! Please check your email inbox.');
+      await api.post('/api/auth/forgot-password', { email });
     } catch (err) {
-      setMessage('❌ Email not found.');
+      // Swallow specific errors — never reveal whether the email exists.
+      console.error(err);
     }
+    setMessage("✅ If that address has an account, we've sent a reset link.");
   };
 
   return (

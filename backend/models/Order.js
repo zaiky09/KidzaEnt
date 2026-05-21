@@ -15,6 +15,11 @@ const orderSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'accepted_by_driver', 'in_transit', 'delivered', 'cancelled'], default: 'pending' },
   expectedDeliveryDate: { type: Date, required: true },
   deliveryAddress: { type: String, required: true },
+  customerPhone: { type: String, required: true },
+  dropoffLat: { type: Number, required: true },
+  dropoffLng: { type: Number, required: true },
+  paymentMethod: { type: String, enum: ['mpesa_upfront', 'mpesa_on_delivery'], default: 'mpesa_on_delivery' },
+  paymentStatus: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
   totalPrice: { type: Number, required: true },
   totalWeightKg: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now }

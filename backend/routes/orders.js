@@ -2,19 +2,16 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 const CatalogItem = require('../models/CatalogItem');
-const User = require('../models/User'); 
-const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const { verifyToken } = require('../middleware/authMiddleware');
 
-const verifyToken = (req, res, next) => {
-  const token = req.header('Authorization');
-  if (!token) return res.status(401).json({ message: 'Access Denied' });
-  try {
-    const verified = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET || 'supersecretkey');
-    req.user = verified;
-    next();
-  } catch (err) {
-    res.status(400).json({ message: 'Invalid Token' });
-  }
+// Which status transitions each role is allowed to perform.
+const ALLOWED_TRANSITIONS = {
+  driver:   { pending: ['accepted_by_driver'], accepted_by_driver: ['in_transit'], in_transit: ['delivered'] },
+  admin:    { pending: ['accepted_by_driver', 'in_transit', 'delivered', 'cancelled'],
+              accepted_by_driver: ['in_transit', 'delivered', 'cancelled'],
+              in_transit: ['delivered', 'cancelled'] },
+  customer: {} // customers use /cancel instead
 };
 
 router.post('/', verifyToken, async (req, res) => {
@@ -111,13 +108,35 @@ router.put('/:id/status', verifyToken, async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found.' });
 
-    if (req.body.status === 'accepted_by_driver' && order.status === 'pending') {
-      order.driverId = req.user.userId;
+    const { role, userId } = req.user;
+    const nextStatus = req.body.status;
+
+    // Conflict-first: a driver trying to accept an order that's already been
+    // claimed by another driver gets a precise 409, not a generic 403.
+    if (role === 'driver' && nextStatus === 'accepted_by_driver' && order.driverId) {
+      return res.status(409).json({ message: 'Order already accepted by another driver.' });
     }
-    order.status = req.body.status;
+
+    // 1. Is the requested transition allowed for this role at all?
+    const allowed = (ALLOWED_TRANSITIONS[role] || {})[order.status] || [];
+    if (!allowed.includes(nextStatus)) {
+      return res.status(403).json({ message: 'Not allowed to perform this transition.' });
+    }
+
+    // 2. Drivers may only act on orders that are unassigned (to accept) or assigned to them.
+    if (role === 'driver') {
+      if (nextStatus === 'accepted_by_driver') {
+        order.driverId = userId;
+      } else if (order.driverId?.toString() !== userId) {
+        return res.status(403).json({ message: 'You are not assigned to this order.' });
+      }
+    }
+
+    order.status = nextStatus;
     await order.save();
     res.json(order);
   } catch (error) {
+    console.error('Update status error:', error);
     res.status(500).json({ message: 'Server error updating status.' });
   }
 });

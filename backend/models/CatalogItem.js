@@ -1,18 +1,13 @@
 const mongoose = require('mongoose');
+const { productCategories, serviceCategories } = require('../../shared/categories.json');
 
 const catalogItemSchema = new mongoose.Schema({
    name: { type: String, required: true },
    type: { type: String, enum: ['product', 'service'], required: true },
-   // NEW: Categories to prevent mixing items
-   category: { 
-     type: String, 
+   category: {
+     type: String,
      required: true,
-     enum: [
-       // Product Categories
-       'Fresh Produce', 'Household Cleaning', 'Beverages', 'Pantry Staples', 'Snacks', 
-       // Service Categories
-       'Plumbing', 'Cleaning', 'Electrical', 'Beauty & Wellness', 'Other'
-     ] 
+     enum: [...productCategories, ...serviceCategories]
    },
    price: { type: Number, required: true },
    weightPerItemKg: { type: Number },

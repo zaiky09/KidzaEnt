@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const DriverProfileForm = ({ onProfileSubmit }) => {
   const [formData, setFormData] = useState({
@@ -11,11 +11,8 @@ const DriverProfileForm = ({ onProfileSubmit }) => {
 
   useEffect(() => {
     const fetchExistingData = async () => {
-      const token = localStorage.getItem('token');
       try {
-        const res = await axios.get('http://localhost:5000/api/users/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await api.get('/api/users/me');
         if (res.data.driverDetails) setFormData(res.data.driverDetails);
       } catch (err) { console.log("New user, no profile found."); }
     };
@@ -29,11 +26,8 @@ const DriverProfileForm = ({ onProfileSubmit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const token = localStorage.getItem('token');
     try {
-      await axios.put('http://localhost:5000/api/users/complete-profile', formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put('/api/users/complete-profile', formData);
       setMessage('✅ Profile Submitted! Waiting for verification.');
       setTimeout(() => { if (onProfileSubmit) onProfileSubmit(); }, 2000);
     } catch {
