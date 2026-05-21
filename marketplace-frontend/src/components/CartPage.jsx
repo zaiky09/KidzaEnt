@@ -4,7 +4,7 @@
 // ==========================================
 import { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api';
 import { CartContext } from '../context/CartContext';
 
 
@@ -74,26 +74,20 @@ const CartPage = () => {
 
   const submitOrderToBackend = async (finalPaymentStatus) => {
     setIsProcessing(true);
-    const token = localStorage.getItem('token');
-    
+
     try {
       const formattedItems = cart.map(cartItem => ({ item: cartItem._id, quantity: Number(cartItem.quantity) }));
 
-
-      await axios.post(
-        'http://localhost:5000/api/orders',
-        {
-          items: formattedItems,
-          expectedDeliveryDate: deliveryDate,
-          deliveryAddress,
-          customerPhone,
-          dropoffLat,
-          dropoffLng,
-          paymentMethod,
-          paymentStatus: finalPaymentStatus
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.post('/api/orders', {
+        items: formattedItems,
+        expectedDeliveryDate: deliveryDate,
+        deliveryAddress,
+        customerPhone,
+        dropoffLat,
+        dropoffLng,
+        paymentMethod,
+        paymentStatus: finalPaymentStatus
+      });
 
 
       clearCart();

@@ -1,0 +1,16 @@
+{
+  "productCategories": [
+    "Fresh Produce",
+    "Household Cleaning",
+    "Beverages",
+    "Pantry Staples",
+    "Snacks"
+  ],
+  "serviceCategories": [
+    "Plumbing",
+    "Cleaning",
+    "Electrical",
+    "Beauty & Wellness",
+    "Other"
+  ]
+}

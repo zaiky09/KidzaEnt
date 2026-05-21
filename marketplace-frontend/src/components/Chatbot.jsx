@@ -1,7 +1,7 @@
 // Purpose: Floating AI Customer Support Widget
 
 import { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,7 +32,7 @@ const Chatbot = () => {
 
     try {
       // 2. Ask the AI backend
-      const response = await axios.post('http://localhost:5000/api/ai/chat', {
+      const response = await api.post('/api/ai/chat', {
         message: userMessage
       });
 

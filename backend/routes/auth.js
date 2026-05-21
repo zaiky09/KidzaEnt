@@ -8,12 +8,25 @@ const User = require('../models/User');
 
 const router = express.Router();
 
-// --- GATEKEEPER: VALIDATION HELPER ---
+// --- GATEKEEPER: VALIDATION HELPERS ---
+const MIN_PASSWORD_LENGTH = 8;
+
 const validateInputs = (email, phone) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^(?:254|\+254|0)?(7|1)\d{8}$/; // Kenyan Standard
     return emailRegex.test(email) && phoneRegex.test(phone);
 };
+
+const validatePassword = (password) => {
+    if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    }
+    return null;
+};
+
+// Reset tokens go out to the user in plaintext (in the email link) but are
+// stored hashed in the DB. A DB leak then cannot be turned into valid resets.
+const hashResetToken = (raw) => crypto.createHash('sha256').update(raw).digest('hex');
 
 // --- EMAIL TRANSPORTER SETUP ---
 // This uses the EMAIL_SERVICE from your .env (gmail, outlook, or yahoo)
@@ -42,10 +55,12 @@ router.post('/signup', async (req, res) => {
         if (!validateInputs(email, phone)) {
             return res.status(400).json({ message: 'Invalid email format or Kenyan phone number.' });
         }
+        const pwError = validatePassword(password);
+        if (pwError) return res.status(400).json({ message: pwError });
 
-        const existingUser = await User.findOne({ $or: [{ phone }, { email }] });
+        const existingUser = await User.findOne({ $or: [{ phone }, { email }, { username }] });
         if (existingUser) {
-            return res.status(400).json({ message: 'User already exists with that phone or email.' });
+            return res.status(400).json({ message: 'User already exists with that username, phone, or email.' });
         }
 
         const publicRoles = ['customer', 'driver'];
@@ -85,7 +100,7 @@ router.post('/login', async (req, res) => {
 
         const token = jwt.sign(
             { userId: user._id, role: user.role },
-            process.env.JWT_SECRET || 'supersecretkey',
+            process.env.JWT_SECRET,
             { expiresIn: '1d' }
         );
 
@@ -100,21 +115,29 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// 3. Forgot Password Route
+// 3. Forgot Password Route — always returns the same generic message to avoid
+// leaking whether an email is registered. Actual email send happens out-of-band.
 router.post('/forgot-password', async (req, res) => {
-    const { email } = req.body;
+    const { email } = req.body || {};
+    const generic = { message: 'If that address has an account, a reset link has been sent.' };
+
+    if (typeof email !== 'string' || !email.trim()) {
+        return res.json(generic);
+    }
+
     try {
         const user = await User.findOne({ email: email.toLowerCase() });
-        if (!user) return res.status(404).json({ message: "Email not found." });
+        if (!user) return res.json(generic);
 
-        const resetToken = crypto.randomBytes(20).toString('hex');
-        user.resetPasswordToken = resetToken;
-        user.resetPasswordExpires = Date.now() + 3600000; 
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        user.resetPasswordToken = hashResetToken(rawToken);
+        user.resetPasswordExpires = Date.now() + 3600000;
         await user.save();
 
-        const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const resetUrl = `${frontendUrl}/reset-password/${rawToken}`;
 
-        const mailOptions = {
+        await transporter.sendMail({
             to: user.email,
             from: `"Kidza Support" <${process.env.EMAIL_USER}>`,
             subject: 'Kidza - Password Reset Request',
@@ -126,22 +149,25 @@ router.post('/forgot-password', async (req, res) => {
                 <br/><br/>
                 <p>If you didn't request this, you can safely ignore this email.</p>
             `
-        };
+        });
 
-        await transporter.sendMail(mailOptions);
-        res.json({ message: 'Reset link sent to email!' });
-
+        res.json(generic);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error sending reset email.' });
+        console.error('forgot-password error:', error);
+        // Still return generic to avoid signaling failure modes
+        res.json(generic);
     }
 });
 
 // 4. Reset Password Route
 router.post('/reset-password/:token', async (req, res) => {
     try {
+        const pwError = validatePassword(req.body?.password);
+        if (pwError) return res.status(400).json({ message: pwError });
+
+        const hashed = hashResetToken(req.params.token);
         const user = await User.findOne({
-            resetPasswordToken: req.params.token,
+            resetPasswordToken: hashed,
             resetPasswordExpires: { $gt: Date.now() }
         });
 
@@ -156,6 +182,7 @@ router.post('/reset-password/:token', async (req, res) => {
         res.json({ message: 'Password successfully updated!' });
 
     } catch (error) {
+        console.error('reset-password error:', error);
         res.status(500).json({ message: 'Error resetting password.' });
     }
 });

@@ -1,7 +1,8 @@
 import { useState, useEffect, useContext, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api';
 import { CartContext } from '../context/CartContext';
+import sharedCategories from '../../../shared/categories.json';
 
 const CatalogPage = () => {
   const navigate = useNavigate();
@@ -16,8 +17,8 @@ const CatalogPage = () => {
   const [activeTab, setActiveTab] = useState('product'); // 'product' or 'service'
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const productCategories = ['All', 'Fresh Produce', 'Household Cleaning', 'Beverages', 'Pantry Staples', 'Snacks'];
-  const serviceCategories = ['All', 'Plumbing', 'Cleaning', 'Electrical', 'Beauty & Wellness', 'Other'];
+  const productCategories = ['All', ...sharedCategories.productCategories];
+  const serviceCategories = ['All', ...sharedCategories.serviceCategories];
 
   // AI Search States
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,10 +29,11 @@ const CatalogPage = () => {
   useEffect(() => {
     const fetchCatalog = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/catalog');
+        const response = await api.get('/api/catalog');
         setItems(response.data);
         setLoading(false);
-      } catch {
+      } catch (err) {
+        console.error('Catalog fetch failed:', err);
         setError('Failed to load the catalog.');
         setLoading(false);
       }
@@ -84,7 +86,7 @@ const CatalogPage = () => {
     setSearchMessage('✨ AI is analyzing your request...');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/ai/search', {
+      const response = await api.post('/api/ai/search', {
         query: searchQuery
       });
 
@@ -193,10 +195,10 @@ const CatalogPage = () => {
             displayedItems.map((item) => (
               <div key={item._id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div style={{ height: '200px', backgroundColor: '#F3F4F6', position: 'relative' }}>
-                  <img 
-                    src={item.images?.[0] || 'https://via.placeholder.com/400x200'} 
-                    alt={item.name} 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  <img
+                    src={item.images?.[0] || 'https://placehold.co/400x200?text=No+Image'}
+                    alt={item.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                   <div style={{ position: 'absolute', top: '10px', right: '10px', padding: '4px 10px', background: 'rgba(255,255,255,0.9)', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700' }}>
                     {item.category}

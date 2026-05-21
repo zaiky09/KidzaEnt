@@ -1,6 +1,8 @@
 // Purpose: Premium Admin Control Center with Categories for Goods & Services
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
+import EditUserModal from './EditUserModal';
+import sharedCategories from '../../../shared/categories.json';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inventory');
@@ -12,6 +14,8 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [userRoleView, setUserRoleView] = useState('driver');
   const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
+  const [savingUser, setSavingUser] = useState(false);
 
   // --- FORM STATES (Inventory) ---
   const [name, setName] = useState('');
@@ -24,47 +28,41 @@ const AdminDashboard = () => {
   const [editingId, setEditingId] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Define category lists
-  const productCategories = ['Fresh Produce', 'Household Cleaning', 'Beverages', 'Pantry Staples', 'Snacks'];
-  const serviceCategories = ['Plumbing', 'Cleaning', 'Electrical', 'Beauty & Wellness', 'Other'];
+  const { productCategories, serviceCategories } = sharedCategories;
 
   // --- FETCHING LOGIC ---
-  useEffect(() => {
-    fetchCatalog();
-    fetchOrders();
-    fetchUsers(userRoleView);
-  }, [userRoleView]);
+  // Catalog and orders are independent of which user-role tab is selected, so
+  // fetch them once on mount; only re-fetch users when the role view changes.
+  useEffect(() => { fetchCatalog(); fetchOrders(); }, []);
+  useEffect(() => { fetchUsers(userRoleView); }, [userRoleView]);
 
   const fetchCatalog = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/catalog');
+      const res = await api.get('/api/catalog');
       setCatalogItems(res.data);
-    } catch { console.error("Error fetching catalog"); }
+    } catch (err) { console.error('Error fetching catalog:', err); }
   };
 
   const fetchOrders = async () => {
-    const token = localStorage.getItem('token');
     try {
-      const res = await axios.get('http://localhost:5000/api/orders', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await api.get('/api/orders');
       setOrders(res.data);
-    } catch { console.error("Error fetching orders"); }
+    } catch (err) { console.error('Error fetching orders:', err); }
   };
 
   const fetchUsers = async (role) => {
-    const token = localStorage.getItem('token');
     try {
-      const res = await axios.get(`http://localhost:5000/api/users?role=${role}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await api.get(`/api/users?role=${role}`);
       setUsers(res.data);
-    } catch { console.error("Error fetching users"); }
+    } catch (err) { console.error('Error fetching users:', err); }
   };
 
   // --- INVENTORY HANDLERS ---
   const handleGenerateDescription = async () => {
     if (!name) return setMessage('⚠️ Type an Item Name first!');
     setIsGenerating(true);
-    const token = localStorage.getItem('token');
     try {
-      const res = await axios.post('http://localhost:5000/api/ai/generate-description', { itemName: name, itemType: type }, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await api.post('/api/ai/generate-description', { itemName: name, itemType: type });
       setDescription(res.data.description);
       setMessage('✅ AI Description generated!');
     } catch { setMessage('❌ AI failed.'); }
@@ -73,19 +71,18 @@ const AdminDashboard = () => {
 
   const handleInventorySubmit = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
     const payload = {
-        name, 
-        type, 
-        category, // Added Category to payload
+        name,
+        type,
+        category,
         price: Number(price),
         weightPerItemKg: type === 'product' ? Number(weightPerItemKg) : undefined,
-        description, 
+        description,
         images: images ? images.split(',').map(u => u.trim()) : []
     };
     try {
-      if (editingId) await axios.put(`http://localhost:5000/api/catalog/${editingId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
-      else await axios.post('http://localhost:5000/api/catalog', payload, { headers: { Authorization: `Bearer ${token}` } });
+      if (editingId) await api.put(`/api/catalog/${editingId}`, payload);
+      else await api.post('/api/catalog', payload);
       resetForm(); fetchCatalog();
       setMessage(editingId ? 'Item updated!' : 'Item added!');
     } catch { setMessage('Failed to save.'); }
@@ -93,9 +90,8 @@ const AdminDashboard = () => {
 
   const handleDeleteItem = async (id) => {
     if (!window.confirm("Delete this item?")) return;
-    const token = localStorage.getItem('token');
     try {
-      await axios.delete(`http://localhost:5000/api/catalog/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await api.delete(`/api/catalog/${id}`);
       fetchCatalog();
     } catch { alert("Failed to delete."); }
   };
@@ -119,9 +115,8 @@ const AdminDashboard = () => {
 
   // --- USER MANAGEMENT HANDLERS ---
   const handleApproveDriver = async (driverId, currentStatus) => {
-    const token = localStorage.getItem('token');
     try {
-      await axios.put(`http://localhost:5000/api/users/${driverId}/approve`, { isApproved: !currentStatus }, { headers: { Authorization: `Bearer ${token}` } });
+      await api.put(`/api/users/${driverId}/approve`, { isApproved: !currentStatus });
       fetchUsers('driver');
       setMessage('Driver status updated.');
     } catch { alert("Error updating driver."); }
@@ -129,27 +124,30 @@ const AdminDashboard = () => {
 
   const handleDeleteUser = async (id) => {
     if (!window.confirm("Permanently delete this user account?")) return;
-    const token = localStorage.getItem('token');
     try {
-      await axios.delete(`http://localhost:5000/api/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await api.delete(`/api/users/${id}`);
       fetchUsers(userRoleView);
       setMessage('User deleted.');
     } catch { alert("Failed to delete user."); }
   };
 
-  const handleEditUser = (user) => {
-    const newPhone = window.prompt("Update Phone Number for " + user.username, user.phone);
-    if (!newPhone) return;
-    const token = localStorage.getItem('token');
-    axios.put(`http://localhost:5000/api/users/${user._id}`, { phone: newPhone }, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(() => fetchUsers(userRoleView)).catch(() => alert("Update failed"));
+  const handleEditUser = (user) => setEditingUser(user);
+
+  const handleSaveUser = async (id, payload) => {
+    setSavingUser(true);
+    try {
+      await api.put(`/api/users/${id}`, payload);
+      setEditingUser(null);
+      fetchUsers(userRoleView);
+      setMessage('User updated.');
+    } finally {
+      setSavingUser(false);
+    }
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
-    const token = localStorage.getItem('token');
     try {
-      await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, { status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+      await api.put(`/api/orders/${orderId}/status`, { status: newStatus });
       fetchOrders();
     } catch { alert("Status update failed"); }
   };
@@ -224,7 +222,7 @@ const AdminDashboard = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
             {catalogItems.map(item => (
               <div key={item._id} className="glass-card" style={{ padding: '20px', display: 'flex', gap: '15px', alignItems: 'center' }}>
-                <img src={item.images?.[0] || 'https://via.placeholder.com/60'} alt="" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
+                <img src={item.images?.[0] || 'https://placehold.co/60?text=No+Img'} alt="" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
                 <div style={{ flex: 1 }}>
                   <h4 style={{ margin: 0 }}>{item.name}</h4>
                   <span style={{ fontSize: '0.7rem', color: '#6B7280', textTransform: 'uppercase', fontWeight: 'bold' }}>{item.category}</span>
@@ -260,6 +258,13 @@ const AdminDashboard = () => {
           ))}
         </div>
       )}
+
+      <EditUserModal
+        user={editingUser}
+        saving={savingUser}
+        onClose={() => setEditingUser(null)}
+        onSave={handleSaveUser}
+      />
 
       {/* ================= USERS ================= */}
       {activeTab === 'users' && (

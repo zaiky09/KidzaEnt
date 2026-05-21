@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import DriverProfileForm from './DriverProfileForm';
-
-const socket = io('http://localhost:5000');
+import api, { API_BASE_URL } from '../api';
 
 const DriverDashboard = () => {
   const [orders, setOrders] = useState([]);
@@ -15,14 +13,25 @@ const DriverDashboard = () => {
   const [error, setError] = useState('');
   const [sharingOrderId, setSharingOrderId] = useState(null);
 
-  const fetchData = async () => {
+  // Refs so we can clean up the socket connection and the GPS interval on unmount.
+  const socketRef = useRef(null);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) return setError('Please log in.');
+    if (!token) return;
+    socketRef.current = io(API_BASE_URL, { auth: { token } });
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      socketRef.current?.disconnect();
+    };
+  }, []);
+
+  const fetchData = async () => {
+    if (!localStorage.getItem('token')) return setError('Please log in.');
     setLoading(true);
     try {
-      const orderRes = await axios.get('http://localhost:5000/api/orders', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const orderRes = await api.get('/api/orders');
       setOrders(orderRes.data);
       setDriverStatus({ isApproved: true, isProfileComplete: true });
     } catch (err) {
@@ -44,9 +53,13 @@ const DriverDashboard = () => {
   }, []);
 
   const updateOrderStatus = async (orderId, newStatus) => {
-    const token = localStorage.getItem('token');
     try {
-      await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, { status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+      await api.put(`/api/orders/${orderId}/status`, { status: newStatus });
+      if (newStatus === 'delivered' && intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+        setSharingOrderId(null);
+      }
       fetchData();
     } catch {
       alert('Failed to update status.');
@@ -54,13 +67,14 @@ const DriverDashboard = () => {
   };
 
   const startSharingLocation = (orderId, startLat, startLng) => {
+    if (intervalRef.current) clearInterval(intervalRef.current); // never run two intervals at once
     setSharingOrderId(orderId);
     let currentLat = startLat || -1.286389;
     let currentLng = startLng || 36.817223;
     alert('Live tracking active!');
-    setInterval(() => {
+    intervalRef.current = setInterval(() => {
       currentLat += 0.0002; currentLng += 0.0002;
-      socket.emit('driver_location_update', { orderId, location: { lat: currentLat, lng: currentLng } });
+      socketRef.current?.emit('driver_location_update', { orderId, location: { lat: currentLat, lng: currentLng } });
     }, 2000);
   };
 

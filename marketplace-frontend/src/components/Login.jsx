@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import api from '../api';
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -25,8 +25,8 @@ const Login = () => {
       setMessage('❌ Enter a valid Kenyan phone (e.g. 0712345678).');
       return false;
     }
-    if (password.length < 6) {
-      setMessage('❌ Password must be at least 6 characters.');
+    if (password.length < 8) {
+      setMessage('❌ Password must be at least 8 characters.');
       return false;
     }
     return true;
@@ -40,15 +40,15 @@ const Login = () => {
 
     try {
       if (isLogin) {
-        const response = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+        const response = await api.post('/api/auth/login', { email, password });
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('role', response.data.role);
-        
+
         if (response.data.role === 'admin') navigate('/admin');
         else if (response.data.role === 'driver') navigate('/driver');
         else navigate('/');
       } else {
-        await axios.post('http://localhost:5000/api/auth/signup', {
+        await api.post('/api/auth/signup', {
           username, email, password, phone,
           role: isDriverSignup ? 'driver' : 'customer'
         });

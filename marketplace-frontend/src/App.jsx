@@ -1,5 +1,5 @@
 // Purpose: Main entry point that handles routing (page navigation)
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import CatalogPage from './components/CatalogPage';
@@ -12,6 +12,7 @@ import Chatbot from './components/Chatbot';
 import HomePage from './components/HomePage';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import ProtectedRoute from './components/ProtectedRoute';
 
 
 function App() {
@@ -27,10 +28,18 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/login" element={<Login/>} />
-          <Route path="/customer" element={<CustomerDashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/driver" element={<DriverDashboard />} />
-          <Route path="/cart" element={<CartPage />} />
+          <Route path="/customer" element={
+            <ProtectedRoute allow={['customer', 'admin']}><CustomerDashboard /></ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <ProtectedRoute allow={['admin']}><AdminDashboard /></ProtectedRoute>
+          } />
+          <Route path="/driver" element={
+            <ProtectedRoute allow={['driver', 'admin']}><DriverDashboard /></ProtectedRoute>
+          } />
+          <Route path="/cart" element={
+            <ProtectedRoute allow={['customer', 'admin']}><CartPage /></ProtectedRoute>
+          } />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
         </Routes>

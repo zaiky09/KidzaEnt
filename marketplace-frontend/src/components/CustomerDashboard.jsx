@@ -1,15 +1,12 @@
 // Purpose: Million-Dollar Styled Customer Dashboard with Live Map and Thumbnails
 
 
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-
-
-const socket = io('http://localhost:5000');
+import api, { API_BASE_URL } from '../api';
 
 
 const carIcon = new L.DivIcon({
@@ -27,33 +24,42 @@ const CustomerDashboard = () => {
   const [trackingOrderId, setTrackingOrderId] = useState(null);
   const [liveLocation, setLiveLocation] = useState(null);
 
+  const socketRef = useRef(null);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('You must be logged in.');
+      setLoading(false);
+      return;
+    }
+
+    socketRef.current = io(API_BASE_URL, { auth: { token } });
+    socketRef.current.on('receive_location_update', (location) => setLiveLocation(location));
+
     const fetchOrders = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) return setError('You must be logged in.');
       try {
-        const response = await axios.get('http://localhost:5000/api/orders', { headers: { Authorization: `Bearer ${token}` } });
+        const response = await api.get('/api/orders');
         setOrders(response.data);
-        setLoading(false);
-      } catch {
+      } catch (err) {
+        console.error(err);
         setError('Failed to load orders.');
+      } finally {
         setLoading(false);
       }
     };
-
-
     fetchOrders();
-    socket.on('receive_location_update', (location) => setLiveLocation(location));
-    return () => socket.off('receive_location_update');
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
   }, []);
 
 
   const handleCancelOrder = async (orderId) => {
     if (!window.confirm("Are you sure you want to cancel this order?")) return;
-    const token = localStorage.getItem('token');
     try {
-      await axios.put(`http://localhost:5000/api/orders/${orderId}/cancel`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      await api.put(`/api/orders/${orderId}/cancel`, {});
       setOrders((prev) => prev.map((o) => o._id === orderId ? { ...o, status: 'cancelled' } : o));
     } catch {
       alert('Failed to cancel the order.');
@@ -64,7 +70,7 @@ const CustomerDashboard = () => {
   const startTracking = (orderId) => {
     setTrackingOrderId(orderId);
     setLiveLocation(null);
-    socket.emit('join_order_room', orderId);
+    socketRef.current?.emit('join_order_room', orderId);
   };
 
 
@@ -136,7 +142,7 @@ const CustomerDashboard = () => {
                           return (
                             <div key={idx} style={{ width: 60, height: 60, borderRadius: '8px', overflow: 'hidden', backgroundColor: '#F3F4F6', border: '1px solid #E5E7EB', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                               {thumb ? (
-                                <img src={thumb} alt={lineItem.item?.name || 'Item'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = 'https://via.placeholder.com/60?text=No+Img'; }} />
+                                <img src={thumb} alt={lineItem.item?.name || 'Item'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = 'https://placehold.co/60?text=No+Img'; }} />
                               ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '10px', color: '#9CA3AF', textAlign: 'center' }}>No img</div>
                               )}

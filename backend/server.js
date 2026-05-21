@@ -1,49 +1,85 @@
-//Purpose: Main entry point for the backend server
+// Server entry point. The Express app lives in app.js; this file wires
+// up the http server, Socket.IO, MongoDB connection, and starts listening.
 
-//1. Import required packages
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-require('dotenv').config(); // Alows us to use variables from the .env file
+require('dotenv').config();
 
-//Imports for real-time tracking
+// Fail fast if required secrets are missing — never fall back to a hardcoded default.
+const REQUIRED_ENV = ['JWT_SECRET', 'MONGO_URI'];
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`❌ Missing required environment variable: ${key}`);
+    process.exit(1);
+  }
+}
+
 const http = require('http');
+const mongoose = require('mongoose');
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 
-//2. Initialize the Express application
-const app = express();
+const app = require('./app');
+const Order = require('./models/Order');
 
-//3. Apply Middleware
-//CORS allow your frontend to communicate with this backend safely
-app.use(cors());
-//This allows the server to read inoming  JSON data from requests
-app.use(express.json());
-
-//4. Set up server and Socket.io for live tracking
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-    cors: {
-        origin: "*", // In production, we will restrict this to your actual app domains
-        methods: ["GET", "POST"]
-    }
+  cors: {
+    origin: process.env.CORS_ORIGIN || '*',
+    methods: ['GET', 'POST']
+  }
 });
 
-// Listen for live connections from the driver or customer apps
-io.on('connection', (socket) => {
-  console.log(`A user connected: ${socket.id}`);
+// Authenticate every Socket.IO handshake. Without this anyone could
+// subscribe to a customer's live GPS or spoof a driver's location.
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Unauthorized: no token'));
+  try {
+    socket.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    next(new Error('Unauthorized: invalid token'));
+  }
+});
 
-  // 1. Customer joins a "room" to listen for updates on a specific order
-  socket.on('join_order_room', (orderId) => {
-    socket.join(orderId);
-    console.log(`User joined tracking room for order: ${orderId}`);
+io.on('connection', (socket) => {
+  console.log(`A user connected: ${socket.id} (userId=${socket.user.userId}, role=${socket.user.role})`);
+
+  // Customer joins a "room" to listen for updates on a specific order.
+  // Only the order's customer, its assigned driver, or an admin may join.
+  socket.on('join_order_room', async (orderId) => {
+    try {
+      const order = await Order.findById(orderId).select('customerId driverId');
+      if (!order) return;
+
+      const userId = socket.user.userId;
+      const isCustomer = order.customerId?.toString() === userId;
+      const isAssignedDriver = order.driverId?.toString() === userId;
+      const isAdmin = socket.user.role === 'admin';
+      if (!isCustomer && !isAssignedDriver && !isAdmin) return;
+
+      socket.join(orderId);
+      console.log(`User ${userId} joined tracking room for order: ${orderId}`);
+    } catch (err) {
+      console.error('join_order_room error:', err.message);
+    }
   });
 
-  // 2. Driver continuously sends their live GPS location for an order
-  socket.on('driver_location_update', (data) => {
-    const { orderId, location } = data; // location contains { lat, lng }
-    
-    // 3. Server broadcasts this location ONLY to the customer in that specific room
-    io.to(orderId).emit('receive_location_update', location);
+  // Driver continuously sends their live GPS location for an order.
+  // Only the assigned driver for that order may emit.
+  socket.on('driver_location_update', async (data) => {
+    try {
+      const { orderId, location } = data || {};
+      if (!orderId || !location || typeof location.lat !== 'number' || typeof location.lng !== 'number') return;
+
+      const order = await Order.findById(orderId).select('driverId status');
+      if (!order) return;
+      if (order.driverId?.toString() !== socket.user.userId) return;
+      if (order.status !== 'in_transit' && order.status !== 'accepted_by_driver') return;
+
+      io.to(orderId).emit('receive_location_update', location);
+    } catch (err) {
+      console.error('driver_location_update error:', err.message);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -51,56 +87,22 @@ io.on('connection', (socket) => {
   });
 });
 
-// 5. Connect to MongoDB using Mongoose
-// NEW: Added robust connection options and forced IPv4 (family: 4)
 mongoose.connect(process.env.MONGO_URI, {
-  serverSelectionTimeoutMS: 5000, 
-  socketTimeoutMS: 45000,         
-  family: 4 // THIS IS THE MAGIC TRICK! Forces IPv4 routing.
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  family: 4
 })
 .then(() => {
-   console.log('Successfully connected to MongoDB 🚀');
-
-
-   // Clean up old index if it exists (ignore errors)
-   mongoose.connection.collection('users').dropIndex('emailOrPhone_1')
-   .then(() => console.log('Old index cleanup completed'))
-   .catch(() => console.log('No old index to clean up, moving on.'));
+  console.log('Successfully connected to MongoDB 🚀');
+  mongoose.connection.collection('users').dropIndex('emailOrPhone_1')
+    .then(() => console.log('Old index cleanup completed'))
+    .catch(() => console.log('No old index to clean up, moving on.'));
 })
 .catch((err) => {
-   console.error('❌ Error connecting to the database:', err.message);
+  console.error('❌ Error connecting to the database:', err.message);
 });
 
-//6. Define a simple test route
-//Import the auth routes
-const authRoutes = require('./routes/auth');
-
-//Tell Express to use them
-app.use('/api/auth', authRoutes);
-app.get('/', (req, res) => {
-    res.send('Welcome to the Marketplace API!');
-});
-
-//Import the catalog routes
-const catalogRoutes = require('./routes/catalog');
-
-//Tell Express to use them
-app.use('/api/catalog', catalogRoutes);
-
-//Import the orders routes
-const ordersRoutes = require('./routes/orders');
-//Import the user management routes
-const usersRoutes = require('./routes/users');
-
-//Tell Express to use them
-app.use('/api/orders', ordersRoutes);
-app.use('/api/users', usersRoutes);
-
-//NEW: The AI Route
-app.use('/api/ai', require('./routes/ai'));
-
-//7. Start the server
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
