@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 import EditUserModal from './EditUserModal';
+import PhotoLightbox from './PhotoLightbox';
 import sharedCategories from '../../../shared/categories.json';
 
 const AdminDashboard = () => {
@@ -16,6 +17,7 @@ const AdminDashboard = () => {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [savingUser, setSavingUser] = useState(false);
+  const [lightboxPhoto, setLightboxPhoto] = useState(null); // { src, alt }
 
   // --- FORM STATES (Inventory) ---
   const [name, setName] = useState('');
@@ -267,6 +269,12 @@ const AdminDashboard = () => {
         onSave={handleSaveUser}
       />
 
+      <PhotoLightbox
+        src={lightboxPhoto?.src}
+        alt={lightboxPhoto?.alt}
+        onClose={() => setLightboxPhoto(null)}
+      />
+
       {/* ================= USERS ================= */}
       {activeTab === 'users' && (
         <div>
@@ -301,18 +309,47 @@ const AdminDashboard = () => {
                   </div>
                   {isDriver && user.driverDetails && (
                     <div style={{ padding: '20px', borderTop: '1px solid #E5E7EB' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem' }}>
+                      {/* Documents row — tap any thumbnail to open full-size */}
+                      <p style={{ margin: '0 0 8px 0', fontSize: '0.72rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.03em' }}>📄 Uploaded documents</p>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '15px' }}>
+                        {[
+                          { label: 'Profile', src: user.driverDetails.profilePhoto },
+                          { label: 'National ID', src: user.driverDetails.idPhoto },
+                          { label: 'Driving License', src: user.driverDetails.licensePhoto }
+                        ].map((p) => (
+                          <div
+                            key={p.label}
+                            onClick={() => p.src && setLightboxPhoto({ src: p.src, alt: `${user.username} — ${p.label}` })}
+                            style={{ textAlign: 'center', cursor: p.src ? 'zoom-in' : 'default', flex: '1 1 80px', minWidth: '80px' }}
+                          >
+                            {p.src ? (
+                              <img
+                                src={p.src}
+                                alt={p.label}
+                                style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E5E7EB', display: 'block' }}
+                              />
+                            ) : (
+                              <div style={{ width: '100%', height: '80px', borderRadius: '8px', border: '1px dashed #D1D5DB', background: '#FAFAFA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#9CA3AF' }}>Missing</div>
+                            )}
+                            <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: '4px', fontWeight: 600 }}>{p.label}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Text details */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.82rem' }}>
                         <div style={{ background: '#F3F4F6', padding: '10px', borderRadius: '8px' }}>
                           <p style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>Identity</p>
-                          <p style={{ margin: 0 }}>ID: {user.driverDetails.nationalId}</p>
-                          <a href={user.driverDetails.idPhoto} target="_blank" rel="noreferrer" style={{ color: '#3B82F6', fontSize: '0.75rem' }}>View ID ↗</a>
+                          <p style={{ margin: 0 }}>National ID: <strong>{user.driverDetails.nationalId || '—'}</strong></p>
+                          <p style={{ margin: '4px 0 0 0' }}>License #: <strong>{user.driverDetails.licenseNumber || '—'}</strong></p>
                         </div>
                         <div style={{ background: '#F3F4F6', padding: '10px', borderRadius: '8px' }}>
                           <p style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>Vehicle</p>
-                          <p style={{ margin: 0 }}>{user.driverDetails.vehicleReg}</p>
-                          <p style={{ margin: 0 }}>{user.driverDetails.vehicleType}</p>
+                          <p style={{ margin: 0 }}>{user.driverDetails.vehicleReg || '—'}</p>
+                          <p style={{ margin: '4px 0 0 0' }}>{user.driverDetails.vehicleColor} {user.driverDetails.vehicleType}</p>
                         </div>
                       </div>
+
                       <button onClick={() => handleApproveDriver(user._id, user.isApproved)} className="btn-primary" style={{ width: '100%', marginTop: '15px', backgroundColor: user.isApproved ? '#EF4444' : '#10B981' }}>
                         {user.isApproved ? 'Revoke Approval' : 'Approve Driver'}
                       </button>
