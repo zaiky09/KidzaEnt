@@ -149,9 +149,10 @@ router.get('/', verifyToken, async (req, res) => {
       const driver = await User.findById(req.user.userId);
       
       if (!driver || !driver.isApproved) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           message: 'Account pending admin approval.',
-          needsProfile: !driver?.isProfileComplete 
+          needsProfile: !driver?.isProfileComplete,
+          rejectionReason: driver?.rejectionReason || null
         });
       }
 

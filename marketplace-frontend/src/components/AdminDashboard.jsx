@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import api from '../api';
 import EditUserModal from './EditUserModal';
 import PhotoLightbox from './PhotoLightbox';
+import RejectDriverModal from './RejectDriverModal';
 import sharedCategories from '../../../shared/categories.json';
 
 const AdminDashboard = () => {
@@ -18,6 +19,8 @@ const AdminDashboard = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [savingUser, setSavingUser] = useState(false);
   const [lightboxPhoto, setLightboxPhoto] = useState(null); // { src, alt }
+  const [rejectingDriver, setRejectingDriver] = useState(null); // { user, mode }
+  const [savingReject, setSavingReject] = useState(false);
 
   // --- FORM STATES (Inventory) ---
   const [name, setName] = useState('');
@@ -116,12 +119,25 @@ const AdminDashboard = () => {
   };
 
   // --- USER MANAGEMENT HANDLERS ---
-  const handleApproveDriver = async (driverId, currentStatus) => {
+  const approveDriver = async (driverId) => {
     try {
-      await api.put(`/api/users/${driverId}/approve`, { isApproved: !currentStatus });
+      await api.put(`/api/users/${driverId}/approve`, { isApproved: true });
       fetchUsers('driver');
-      setMessage('Driver status updated.');
-    } catch { alert("Error updating driver."); }
+      setMessage('Driver approved. Email sent.');
+    } catch { alert("Error approving driver."); }
+  };
+
+  const submitRejection = async (reason) => {
+    if (!rejectingDriver) return;
+    setSavingReject(true);
+    try {
+      await api.put(`/api/users/${rejectingDriver.user._id}/approve`, { isApproved: false, reason });
+      setRejectingDriver(null);
+      fetchUsers('driver');
+      setMessage(rejectingDriver.mode === 'revoke' ? 'Driver approval revoked. Email sent.' : 'Driver rejected. Email sent with reason.');
+    } finally {
+      setSavingReject(false);
+    }
   };
 
   const handleDeleteUser = async (id) => {
@@ -275,6 +291,15 @@ const AdminDashboard = () => {
         onClose={() => setLightboxPhoto(null)}
       />
 
+      <RejectDriverModal
+        key={rejectingDriver?.user?._id || 'closed'}
+        driver={rejectingDriver?.user}
+        mode={rejectingDriver?.mode}
+        saving={savingReject}
+        onClose={() => setRejectingDriver(null)}
+        onSubmit={submitRejection}
+      />
+
       {/* ================= USERS ================= */}
       {activeTab === 'users' && (
         <div>
@@ -350,9 +375,34 @@ const AdminDashboard = () => {
                         </div>
                       </div>
 
-                      <button onClick={() => handleApproveDriver(user._id, user.isApproved)} className="btn-primary" style={{ width: '100%', marginTop: '15px', backgroundColor: user.isApproved ? '#EF4444' : '#10B981' }}>
-                        {user.isApproved ? 'Revoke Approval' : 'Approve Driver'}
-                      </button>
+                      {/* Last rejection reason — visible to admin even after the driver re-submits */}
+                      {user.rejectionReason && !user.isApproved && (
+                        <div style={{ marginTop: '15px', padding: '10px 12px', borderLeft: '3px solid #EF4444', background: '#FEF2F2', borderRadius: '6px', fontSize: '0.82rem', color: '#7F1D1D' }}>
+                          <p style={{ margin: '0 0 4px 0', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Last rejection reason</p>
+                          {user.rejectionReason}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
+                        {user.isApproved ? (
+                          <button
+                            onClick={() => setRejectingDriver({ user, mode: 'revoke' })}
+                            style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', backgroundColor: '#EF4444', color: '#FFF', fontWeight: 700, cursor: 'pointer' }}
+                          >Revoke Approval</button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => setRejectingDriver({ user, mode: 'reject' })}
+                              style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #EF4444', background: '#FFF', color: '#B91C1C', fontWeight: 700, cursor: 'pointer' }}
+                            >Reject…</button>
+                            <button
+                              onClick={() => approveDriver(user._id)}
+                              className="btn-primary"
+                              style={{ flex: 1, backgroundColor: '#10B981' }}
+                            >Approve</button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

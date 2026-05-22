@@ -72,28 +72,51 @@ router.put('/complete-profile', verifyToken, async (req, res) => {
 // ADMIN ROUTES (Token AND Admin role required)
 // ==========================================
 
-// 2. Approve/Reject Driver. On status change, email the driver
-// (best-effort — failure to send email never blocks the DB write).
+// 2. Approve / Reject driver. Accepts:
+//   { isApproved: true }                          → approval (clears reason)
+//   { isApproved: false, reason: 'Blurry ID' }    → rejection with reason
+//   { isApproved: false }                         → silent unapprove (no email)
+// On state change we email the driver (best-effort — failure to send email
+// never blocks the DB write). When rejecting, the reason is in the email.
 router.put('/:id/approve', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found.' });
 
     const previousState = !!user.isApproved;
-    user.isApproved = !!req.body.isApproved;
+    const willApprove = !!req.body.isApproved;
+    const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+
+    if (!willApprove && reason && reason.length > 500) {
+      return res.status(400).json({ message: 'Reason must be 500 characters or fewer.' });
+    }
+
+    user.isApproved = willApprove;
+    user.rejectionReason = willApprove ? undefined : (reason || user.rejectionReason);
     await user.save();
 
-    // Only notify on actual state change.
-    if (user.role === 'driver' && user.email && previousState !== user.isApproved) {
-      const subject = user.isApproved ? 'You are approved as a Kidza driver' : 'Update on your Kidza driver application';
-      const html = user.isApproved
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://kidzaent.vercel.app';
+    const reasonBlock = reason
+      ? `<p><strong>Reason given by the team:</strong></p>
+         <blockquote style="margin:0 0 10px 0;padding:10px 14px;border-left:3px solid #F5B041;background:#FFFBEB;color:#92400E;">${reason.replace(/[<>&]/g, (c) => ({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c]))}</blockquote>`
+      : '';
+
+    const shouldEmail =
+      user.role === 'driver' &&
+      user.email &&
+      (previousState !== user.isApproved || (!willApprove && reason));
+
+    if (shouldEmail) {
+      const subject = willApprove ? 'You are approved as a Kidza driver' : 'Update on your Kidza driver application';
+      const html = willApprove
         ? `<p>Hi ${user.username},</p>
            <p>Welcome aboard 🚗 — your Kidza driver application has been approved. You can start accepting delivery requests right away.</p>
-           <p>Log in at <a href="${process.env.FRONTEND_URL || 'https://kidzaent.vercel.app'}/driver">your driver hub</a> to see available trips.</p>
+           <p>Log in at <a href="${FRONTEND_URL}/driver">your driver hub</a> to see available trips.</p>
            <p style="color:#6B7280;font-size:13px;">If this wasn't you, please reply to this email immediately.</p>`
         : `<p>Hi ${user.username},</p>
-           <p>Your Kidza driver status has been temporarily revoked. This usually means an admin needs to re-verify your documents.</p>
-           <p>Please update your KYC details at <a href="${process.env.FRONTEND_URL || 'https://kidzaent.vercel.app'}/driver">your driver hub</a> and resubmit.</p>`;
+           <p>We've reviewed your Kidza driver application and we can't approve it as-is.</p>
+           ${reasonBlock}
+           <p>Please update your details at <a href="${FRONTEND_URL}/driver">your driver hub</a> and resubmit. Reach out at <a href="mailto:${process.env.EMAIL_USER}">${process.env.EMAIL_USER}</a> if anything is unclear.</p>`;
       mailer.sendMail({
         to: user.email,
         from: `"Kidza Marketplace" <${process.env.EMAIL_USER}>`,
@@ -102,7 +125,11 @@ router.put('/:id/approve', verifyToken, verifyAdmin, async (req, res) => {
       }).catch((err) => console.error('[driver-approval-email] failed:', err.message));
     }
 
-    res.json({ message: `Driver status updated to ${user.isApproved ? 'approved' : 'revoked'}.` });
+    res.json({
+      message: willApprove
+        ? 'Driver approved.'
+        : (reason ? 'Driver rejected with reason.' : 'Driver approval revoked.')
+    });
   } catch (error) {
     console.error('Approve driver error:', error);
     res.status(500).json({ message: 'Error updating approval status.' });

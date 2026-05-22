@@ -6,7 +6,7 @@ import MapView from './MapView';
 
 const DriverDashboard = () => {
   const [orders, setOrders] = useState([]);
-  const [driverStatus, setDriverStatus] = useState({ isApproved: false, isProfileComplete: false });
+  const [driverStatus, setDriverStatus] = useState({ isApproved: false, isProfileComplete: false, rejectionReason: null });
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,12 +35,13 @@ const DriverDashboard = () => {
     try {
       const orderRes = await api.get('/api/orders');
       setOrders(orderRes.data);
-      setDriverStatus({ isApproved: true, isProfileComplete: true });
+      setDriverStatus({ isApproved: true, isProfileComplete: true, rejectionReason: null });
     } catch (err) {
       if (err.response?.status === 403) {
         setDriverStatus({
           isApproved: false,
-          isProfileComplete: !err.response.data.needsProfile
+          isProfileComplete: !err.response.data.needsProfile,
+          rejectionReason: err.response.data.rejectionReason || null
         });
       } else {
         setError('Connection failed. Please refresh.');
@@ -142,21 +143,40 @@ const DriverDashboard = () => {
 
   // --- VIEW 2: APPLICATION TRACKER ---
   if (!driverStatus.isApproved) {
+    const rejected = !!driverStatus.rejectionReason;
     return (
       <div style={{ maxWidth: '600px', margin: '80px auto', padding: '40px' }} className="glass-card">
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Onboarding <span style={{ color: '#F5B041' }}>Tracker</span></h2>
           <p onClick={() => setShowProfileEdit(true)} style={{ color: '#3B82F6', cursor: 'pointer', textDecoration: 'underline', marginTop: '10px' }}>Edit my documents</p>
         </div>
-        
+
+        {/* If rejected, show the admin's reason prominently so the driver knows what to fix */}
+        {rejected && (
+          <div style={{ padding: '14px 16px', borderLeft: '4px solid #EF4444', background: '#FEF2F2', borderRadius: '8px', marginBottom: '20px' }}>
+            <p style={{ margin: '0 0 6px 0', fontSize: '0.75rem', fontWeight: 700, color: '#7F1D1D', textTransform: 'uppercase' }}>Action needed</p>
+            <p style={{ margin: 0, color: '#7F1D1D', fontSize: '0.95rem' }}>{driverStatus.rejectionReason}</p>
+            <p style={{ margin: '8px 0 0 0', fontSize: '0.8rem', color: '#9F1239' }}>
+              Update your documents above to address this and re-submit. The admin will review again.
+            </p>
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
             <div style={{ background: '#10B981', color: '#FFF', width: '30px', height: '30px', borderRadius: '50%', textAlign: 'center', lineHeight: '30px' }}>✓</div>
             <p style={{ margin: 0 }}>Documents Submitted</p>
           </div>
           <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-            <div style={{ background: '#DBEAFE', color: '#2563EB', width: '30px', height: '30px', borderRadius: '50%', textAlign: 'center', lineHeight: '30px', animation: 'pulse 1.5s infinite' }}>2</div>
-            <p style={{ margin: 0, color: '#2563EB', fontWeight: 'bold' }}>Pending Admin Review</p>
+            <div style={{
+              background: rejected ? '#FEE2E2' : '#DBEAFE',
+              color: rejected ? '#DC2626' : '#2563EB',
+              width: '30px', height: '30px', borderRadius: '50%', textAlign: 'center', lineHeight: '30px',
+              animation: rejected ? 'none' : 'pulse 1.5s infinite'
+            }}>{rejected ? '✗' : '2'}</div>
+            <p style={{ margin: 0, color: rejected ? '#DC2626' : '#2563EB', fontWeight: 'bold' }}>
+              {rejected ? 'Application needs changes — see above' : 'Pending Admin Review'}
+            </p>
           </div>
         </div>
 

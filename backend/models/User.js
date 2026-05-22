@@ -19,6 +19,9 @@ const userSchema = new mongoose.Schema({
  // --- DRIVER COMPLIANCE (KYC) ---
  isApproved: { type: Boolean, default: false }, // Admin flips this to true
  isProfileComplete: { type: Boolean, default: false }, // Driver flips this by submitting form
+ // Set when admin rejects or revokes; cleared on approval. Surfaced to
+ // the driver in their onboarding tracker so they know what to fix.
+ rejectionReason: { type: String },
  driverDetails: {
    nationalId: { type: String },
    idPhoto: { type: String },
