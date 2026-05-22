@@ -27,8 +27,10 @@ const PlaceAutocomplete = ({
   useEffect(() => {
     if (!places || !containerRef.current) return;
 
+    // PlaceAutocompleteElement uses `includedRegionCodes` (array of ISO
+    // 3166-1 Alpha-2), not the legacy `componentRestrictions.country`.
     const el = new places.PlaceAutocompleteElement({
-      componentRestrictions: { country: 'ke' }
+      includedRegionCodes: ['ke']
     });
     el.className = className;
     if (style) Object.assign(el.style, style);
