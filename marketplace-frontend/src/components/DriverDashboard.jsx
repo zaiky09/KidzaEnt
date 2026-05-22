@@ -15,6 +15,9 @@ const DriverDashboard = () => {
   // Refs so we can clean up the socket connection and the GPS watch on unmount.
   const socketRef = useRef(null);
   const watchIdRef = useRef(null);
+  // Last position we actually sent to the customer; used to skip jittery
+  // sub-5m fluctuations when the driver is stationary.
+  const lastSentRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -76,14 +79,30 @@ const DriverDashboard = () => {
     }
     // Never run two watchers at once.
     if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+    lastSentRef.current = null;
     setSharingOrderId(orderId);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
-        socketRef.current?.emit('driver_location_update', {
-          orderId,
-          location: { lat: position.coords.latitude, lng: position.coords.longitude }
-        });
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const last = lastSentRef.current;
+
+        // Skip updates smaller than the GPS noise floor (~5m). A driver
+        // standing still still emits jittery fixes every second; without
+        // this the customer's marker visibly twitches.
+        if (last) {
+          const dx = (lat - last.lat) * 111320;
+          const dy = (lng - last.lng) * 111320 * Math.cos(lat * Math.PI / 180);
+          const meters = Math.sqrt(dx * dx + dy * dy);
+          const sinceMs = Date.now() - last.t;
+          // Always send at least one update every 10s so the customer's
+          // route ETA keeps refreshing even if the driver is parked.
+          if (meters < 5 && sinceMs < 10_000) return;
+        }
+
+        lastSentRef.current = { lat, lng, t: Date.now() };
+        socketRef.current?.emit('driver_location_update', { orderId, location: { lat, lng } });
       },
       (err) => {
         console.error('GPS error:', err);
