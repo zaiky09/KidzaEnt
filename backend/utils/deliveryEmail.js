@@ -1,13 +1,9 @@
 // Email sent to the customer when their order is marked 'delivered'.
-// Mirrors the receipt-email pattern: own nodemailer transporter, throws on
-// failure so callers can decide whether to await or fire-and-forget.
+// Uses the shared mailer transporter.
 
-const nodemailer = require('nodemailer');
+const { getTransporter } = require('./mailer');
 
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-});
+const transporter = getTransporter();
 
 /**
  * @param {object} order — Order with `customerId` and `items.item` populated.

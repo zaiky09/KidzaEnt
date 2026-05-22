@@ -1,14 +1,10 @@
-// Sends a paid-order receipt to the customer. Uses the same Gmail
-// transporter that's already configured in routes/auth.js — we re-create
-// it here so payments.js doesn't need to import from auth.js.
+// Sends a paid-order receipt to the customer. Uses the shared mailer
+// transporter (utils/mailer.js) so we don't open a separate SMTP pool.
 
-const nodemailer = require('nodemailer');
 const { buildReceiptPdf } = require('./receiptPdf');
+const { getTransporter } = require('./mailer');
 
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-});
+const transporter = getTransporter();
 
 /**
  * Generate the PDF receipt for `order` and email it to the customer.

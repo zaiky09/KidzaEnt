@@ -3,8 +3,8 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const User = require('../models/User');
+const { getTransporter } = require('../utils/mailer');
 
 const router = express.Router();
 
@@ -28,24 +28,9 @@ const validatePassword = (password) => {
 // stored hashed in the DB. A DB leak then cannot be turned into valid resets.
 const hashResetToken = (raw) => crypto.createHash('sha256').update(raw).digest('hex');
 
-// --- EMAIL TRANSPORTER SETUP ---
-// This uses the EMAIL_SERVICE from your .env (gmail, outlook, or yahoo)
-const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail', 
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS // Reminder: Must be an App Password, not login password
-    }
-});
-
-// Quick debug: This runs when the server starts to check if your credentials work
-transporter.verify((error, success) => {
-    if (error) {
-        console.log("❌ Email Service Error:", error.message);
-    } else {
-        console.log(`✅ Email Service Ready (${process.env.EMAIL_SERVICE || 'gmail'})`);
-    }
-});
+// Shared pooled transporter (port 587 + STARTTLS + short timeouts).
+// utils/mailer.js handles the boot-time verify so we don't duplicate logs.
+const transporter = getTransporter();
 
 // 1. Signup Route
 router.post('/signup', async (req, res) => {

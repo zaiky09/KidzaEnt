@@ -2,15 +2,12 @@ const express = require('express');
 const User = require('../models/User');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 const bcrypt = require('bcryptjs');
-const nodemailer = require('nodemailer');
+const { getTransporter } = require('../utils/mailer');
 
 const router = express.Router();
 
-// Shared mailer for driver-status notifications.
-const mailer = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-});
+// Shared pooled mailer (utils/mailer.js).
+const mailer = getTransporter();
 
 // Same regexes the frontend uses, so a tampered/curl request hits the same wall.
 const NATIONAL_ID_RE = /^\d{7,9}$/;
