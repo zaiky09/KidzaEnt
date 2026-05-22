@@ -28,7 +28,12 @@ const orderSchema = new mongoose.Schema({
   mpesaReceiptNumber: { type: String },
   mpesaResultDesc: { type: String },
 
+  // Pricing breakdown. itemSubtotal + deliveryFee = totalPrice.
+  itemSubtotal: { type: Number, required: true },
+  deliveryFee: { type: Number, required: true, default: 0 },
+  distanceKm: { type: Number },
   totalPrice: { type: Number, required: true },
+
   totalWeightKg: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now }
 });

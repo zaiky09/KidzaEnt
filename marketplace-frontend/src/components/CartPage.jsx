@@ -32,13 +32,47 @@ const CartPage = () => {
   // Track the poll timer so we can clear it on unmount or on success.
   const pollTimerRef = useRef(null);
 
+  // Server-side pricing breakdown: { itemSubtotal, deliveryFee, total,
+  // distanceKm, free }. Refreshed whenever dropoff coords change.
+  const [quote, setQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
   const navigate = useNavigate();
-  const grandTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const itemSubtotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  // Use the server quote if we have one; otherwise fall back to local item subtotal.
+  const grandTotal = quote?.total ?? itemSubtotal;
+  const deliveryFee = quote?.deliveryFee ?? null;
 
   // Cancel any pending poll if the user navigates away mid-checkout.
   useEffect(() => () => {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
   }, []);
+
+  // Refresh the server-side quote whenever the cart contents or the
+  // dropoff coordinates change.
+  useEffect(() => {
+    // Sync external state (HTTP fetch) into React. Clearing the quote when
+    // we have nothing to quote is also "syncing external state to nothing",
+    // not a cascading render — disable the lint rule for both branches.
+    if (!cart.length || dropoffLat == null || dropoffLng == null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setQuote(null);
+      return;
+    }
+    const controller = new AbortController();
+    setQuoteLoading(true);
+    api.post('/api/orders/quote', {
+      items: cart.map((c) => ({ item: c._id, quantity: Number(c.quantity) })),
+      dropoffLat, dropoffLng
+    }, { signal: controller.signal })
+      .then((res) => setQuote(res.data))
+      .catch((err) => { if (err.code !== 'ERR_CANCELED') console.error('Quote fetch failed:', err); })
+      .finally(() => setQuoteLoading(false));
+    return () => controller.abort();
+    // We intentionally do NOT re-fetch on every quantity tweak — only when
+    // the cart contents or dropoff change. Quantity changes happen via the
+    // cart context which mutates the cart array reference, so this fires.
+  }, [cart, dropoffLat, dropoffLng]);
 
 
   const handleGetLocation = () => {
@@ -248,11 +282,36 @@ const CartPage = () => {
 
           {/* --- RIGHT COLUMN: CHECKOUT FORM --- */}
           <div className="glass-card" style={{ padding: '30px', height: 'fit-content' }}>
-            <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '20px', marginBottom: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.3rem', color: '#111827' }}>Order Summary</h3>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.9rem', color: '#6B7280' }}>Total to pay</span>
-                <h2 style={{ margin: 0, color: '#10B981', fontSize: '1.8rem' }}>KES {grandTotal.toFixed(2)}</h2>
+            <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: '20px', marginBottom: '25px' }}>
+              <h3 style={{ margin: '0 0 14px 0', fontSize: '1.3rem', color: '#111827' }}>Order Summary</h3>
+
+              {/* Pricing breakdown — items + delivery + grand total */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.95rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#374151' }}>
+                  <span>Item subtotal</span>
+                  <span>KES {itemSubtotal.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#374151' }}>
+                  <span>
+                    Delivery
+                    {quote?.distanceKm != null && (
+                      <span style={{ fontSize: '0.75rem', color: '#6B7280', marginLeft: '6px' }}>· {quote.distanceKm.toFixed(1)} km</span>
+                    )}
+                  </span>
+                  <span>
+                    {dropoffLat == null
+                      ? <span style={{ color: '#6B7280', fontStyle: 'italic' }}>set location to calculate</span>
+                      : quoteLoading
+                        ? <span style={{ color: '#6B7280', fontStyle: 'italic' }}>calculating…</span>
+                        : quote?.free
+                          ? <span style={{ color: '#10B981', fontWeight: 700 }}>FREE</span>
+                          : `KES ${(deliveryFee ?? 0).toFixed(2)}`}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '10px', marginTop: '4px', borderTop: '1px solid #E5E7EB', fontWeight: 700, fontSize: '1.05rem' }}>
+                  <span>Total</span>
+                  <span style={{ color: '#10B981', fontSize: '1.4rem' }}>KES {grandTotal.toFixed(2)}</span>
+                </div>
               </div>
             </div>
             

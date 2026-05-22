@@ -42,6 +42,8 @@ async function seedScenario() {
     customerPhone: '0712345678',
     dropoffLat: -1.286,
     dropoffLng: 36.817,
+    itemSubtotal: 100,
+    deliveryFee: 0,
     totalPrice: 100,
     totalWeightKg: 2
   });

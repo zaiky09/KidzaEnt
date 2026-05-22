@@ -16,6 +16,7 @@ const validate = (form) => {
   if (!form.vehicleColor) return 'Vehicle color is required.';
   if (!form.idPhoto) return 'A photo of your national ID is required.';
   if (!form.licensePhoto) return 'A photo of your driving license is required.';
+  if (!form.profilePhoto) return 'Please upload a profile photo so customers can identify you.';
   return null;
 };
 
@@ -97,7 +98,7 @@ const DriverProfileForm = ({ onProfileSubmit }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
             <FileUpload label="National ID photo" value={formData.idPhoto} onChange={handleUploaded('idPhoto')} />
             <FileUpload label="License photo" value={formData.licensePhoto} onChange={handleUploaded('licensePhoto')} />
-            <FileUpload label="Your profile photo (optional)" value={formData.profilePhoto} onChange={handleUploaded('profilePhoto')} />
+            <FileUpload label="Your profile photo" value={formData.profilePhoto} onChange={handleUploaded('profilePhoto')} />
           </div>
         </div>
 

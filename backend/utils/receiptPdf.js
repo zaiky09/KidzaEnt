@@ -83,10 +83,26 @@ function buildReceiptPdf(order) {
       y += 18;
     }
 
-    // Totals
+    // Totals — itemized when we have a breakdown.
     y += 8;
     doc.moveTo(40, y).lineTo(doc.page.width - 40, y).strokeColor(LIGHT_LINE).stroke();
-    y += 12;
+    y += 10;
+
+    const subtotal = order.itemSubtotal ?? (order.totalPrice || 0);
+    const delivery = order.deliveryFee || 0;
+
+    doc.font('Helvetica').fontSize(10).fillColor(MUTED);
+    doc.text('Subtotal', 410, y, { width: 70, align: 'right' });
+    doc.text(`KES ${subtotal.toFixed(2)}`, 490, y, { width: 70, align: 'right' });
+    y += 14;
+
+    doc.text(
+      order.distanceKm != null ? `Delivery (${order.distanceKm.toFixed(1)} km)` : 'Delivery',
+      410, y, { width: 70, align: 'right' }
+    );
+    doc.text(delivery === 0 ? 'FREE' : `KES ${delivery.toFixed(2)}`, 490, y, { width: 70, align: 'right' });
+    y += 16;
+
     doc.font('Helvetica-Bold').fontSize(12).fillColor(KIDZA_DARK).text('TOTAL', 410, y, { width: 70, align: 'right' });
     doc.text(`KES ${(order.totalPrice || 0).toFixed(2)}`, 490, y, { width: 70, align: 'right' });
 

@@ -4,6 +4,34 @@ const Order = require('../models/Order');
 const CatalogItem = require('../models/CatalogItem');
 const User = require('../models/User');
 const { verifyToken } = require('../middleware/authMiddleware');
+const { computeDeliveryFee } = require('../utils/deliveryFee');
+
+// Helper: walk a cart of {item, quantity}, resolve CatalogItem docs, return
+// either { itemSubtotal, totalWeight } or { error, missing }.
+async function priceCart(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { error: 'Cart is empty.' };
+  }
+  let itemSubtotal = 0;
+  let totalWeight = 0;
+  const missing = [];
+  for (const cartItem of items) {
+    const catalogItem = await CatalogItem.findById(cartItem.item);
+    if (!catalogItem) {
+      missing.push(cartItem.item);
+      continue;
+    }
+    const qty = Number(cartItem.quantity) || 0;
+    itemSubtotal += catalogItem.price * qty;
+    if (catalogItem.type === 'product') {
+      totalWeight += (Number(catalogItem.weightPerItemKg) || 0) * qty;
+    }
+  }
+  if (missing.length) {
+    return { error: 'Some cart items no longer exist.', missing };
+  }
+  return { itemSubtotal, totalWeight };
+}
 
 // Which status transitions each role is allowed to perform.
 const ALLOWED_TRANSITIONS = {
@@ -14,14 +42,41 @@ const ALLOWED_TRANSITIONS = {
   customer: {} // customers use /cancel instead
 };
 
+// Quote endpoint: returns the canonical pricing breakdown without
+// persisting an order. The cart calls this whenever dropoff coords change
+// so the customer sees an accurate "with delivery" total before paying.
+router.post('/quote', verifyToken, async (req, res) => {
+  try {
+    const { items, dropoffLat, dropoffLng, distanceMeters } = req.body || {};
+    if (typeof dropoffLat !== 'number' || typeof dropoffLng !== 'number') {
+      return res.status(400).json({ message: 'Dropoff coordinates required.' });
+    }
+    const priced = await priceCart(items);
+    if (priced.error) return res.status(400).json({ message: priced.error, missing: priced.missing });
+
+    const { distanceKm, deliveryFee, free, source } = computeDeliveryFee({
+      dropoffLat, dropoffLng,
+      subtotal: priced.itemSubtotal,
+      distanceMeters
+    });
+    res.json({
+      itemSubtotal: priced.itemSubtotal,
+      deliveryFee,
+      total: priced.itemSubtotal + deliveryFee,
+      distanceKm: Math.round(distanceKm * 100) / 100,
+      distanceSource: source,
+      free
+    });
+  } catch (err) {
+    console.error('Quote error:', err);
+    res.status(500).json({ message: 'Server error producing quote.' });
+  }
+});
+
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { items, expectedDeliveryDate, deliveryAddress, customerPhone, dropoffLat, dropoffLng } = req.body;
+    const { items, expectedDeliveryDate, deliveryAddress, customerPhone, dropoffLat, dropoffLng, distanceMeters } = req.body;
 
-    // Validate upfront so we return a clear 400 instead of a Mongoose ValidationError as a 500.
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: 'Cart is empty.' });
-    }
     if (typeof dropoffLat !== 'number' || typeof dropoffLng !== 'number') {
       return res.status(400).json({ message: 'Dropoff coordinates are required. Use the address autocomplete or "Get My Location".' });
     }
@@ -29,26 +84,18 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(400).json({ message: 'Address, phone, and delivery date are all required.' });
     }
 
-    let grandTotal = 0;
-    let totalWeight = 0;
-    const missing = [];
+    const priced = await priceCart(items);
+    if (priced.error) {
+      return res.status(400).json({ message: priced.error, missing: priced.missing });
+    }
 
-    for (const cartItem of items) {
-      const catalogItem = await CatalogItem.findById(cartItem.item);
-      if (!catalogItem) {
-        missing.push(cartItem.item);
-        continue;
-      }
-      const qty = Number(cartItem.quantity) || 0;
-      grandTotal += catalogItem.price * qty;
-      // weightPerItemKg may be undefined on services or older items — treat as 0.
-      if (catalogItem.type === 'product') {
-        totalWeight += (Number(catalogItem.weightPerItemKg) || 0) * qty;
-      }
-    }
-    if (missing.length) {
-      return res.status(400).json({ message: 'Some cart items no longer exist. Clear the cart and try again.', missing });
-    }
+    // Authoritative server-side fee. Frontend's distanceMeters is just a
+    // suggestion; computeDeliveryFee validates it and falls back if needed.
+    const { distanceKm, deliveryFee } = computeDeliveryFee({
+      dropoffLat, dropoffLng,
+      subtotal: priced.itemSubtotal,
+      distanceMeters
+    });
 
     const newOrder = new Order({
       customerId: req.user.userId,
@@ -58,8 +105,11 @@ router.post('/', verifyToken, async (req, res) => {
       customerPhone,
       dropoffLat,
       dropoffLng,
-      totalPrice: grandTotal,
-      totalWeightKg: totalWeight
+      itemSubtotal: priced.itemSubtotal,
+      deliveryFee,
+      distanceKm,
+      totalPrice: priced.itemSubtotal + deliveryFee,
+      totalWeightKg: priced.totalWeight
     });
 
     await newOrder.save();

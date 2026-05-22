@@ -51,7 +51,7 @@ router.put('/complete-profile', verifyToken, async (req, res) => {
     if (!d.vehicleColor) return res.status(400).json({ message: 'Vehicle color is required.' });
     if (!URL_RE.test(d.idPhoto || '')) return res.status(400).json({ message: 'National ID photo upload is required.' });
     if (!URL_RE.test(d.licensePhoto || '')) return res.status(400).json({ message: 'License photo upload is required.' });
-    if (d.profilePhoto && !URL_RE.test(d.profilePhoto)) return res.status(400).json({ message: 'Profile photo URL is invalid.' });
+    if (!URL_RE.test(d.profilePhoto || '')) return res.status(400).json({ message: 'Profile photo upload is required.' });
 
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found.' });

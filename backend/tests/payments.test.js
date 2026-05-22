@@ -42,6 +42,7 @@ async function seedOrder() {
     deliveryAddress: '123 Main',
     customerPhone: '0712345678',
     dropoffLat: -1.28, dropoffLng: 36.81,
+    itemSubtotal: 200, deliveryFee: 0,
     totalPrice: 200, totalWeightKg: 1
   });
   return { customer, order };
