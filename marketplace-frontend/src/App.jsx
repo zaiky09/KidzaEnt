@@ -1,5 +1,6 @@
 // Purpose: Main entry point that handles routing (page navigation)
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { APIProvider } from '@vis.gl/react-google-maps';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import CatalogPage from './components/CatalogPage';
@@ -14,9 +15,11 @@ import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 function App() {
   return (
+    <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
     <CartProvider>
     <Router>
       <div>
@@ -48,6 +51,7 @@ function App() {
       </div>
     </Router>
     </CartProvider>
+    </APIProvider>
   );
 }
 

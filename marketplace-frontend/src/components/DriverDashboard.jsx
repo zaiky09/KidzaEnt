@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 import DriverProfileForm from './DriverProfileForm';
 import api, { API_BASE_URL } from '../api';
+import MapView from './MapView';
 
 const DriverDashboard = () => {
   const [orders, setOrders] = useState([]);
@@ -148,10 +147,15 @@ const DriverDashboard = () => {
 
            {sharingOrderId === order._id && order.dropoffLat && (
               <div style={{ height: '250px', margin: '20px 0', borderRadius: '12px', overflow: 'hidden', border: '1px solid #E5E7EB' }}>
-                <MapContainer center={[order.dropoffLat, order.dropoffLng]} zoom={15} style={{ height: '100%' }}>
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <Marker position={[order.dropoffLat, order.dropoffLng]}><Popup>Customer Location</Popup></Marker>
-                </MapContainer>
+                <MapView
+                  center={{ lat: order.dropoffLat, lng: order.dropoffLng }}
+                  zoom={15}
+                  markers={[{
+                    position: { lat: order.dropoffLat, lng: order.dropoffLng },
+                    emoji: '📍',
+                    popup: 'Customer Location'
+                  }]}
+                />
               </div>
            )}
 

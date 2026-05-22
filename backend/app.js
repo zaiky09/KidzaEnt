@@ -14,10 +14,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'https://*.tile.openstreetmap.org', 'https://placehold.co', 'https://ui-avatars.com', 'https:'],
-      connectSrc: ["'self'", 'ws:', 'wss:'],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      // Allow Google Maps tile images + Maps Static images, plus catalog placeholders.
+      imgSrc: ["'self'", 'data:', 'https://*.googleapis.com', 'https://*.gstatic.com', 'https://placehold.co', 'https://ui-avatars.com', 'https:'],
+      connectSrc: ["'self'", 'ws:', 'wss:', 'https://*.googleapis.com'],
+      // Google Maps JS API loads from maps.googleapis.com and may inline some scripts.
+      scriptSrc: ["'self'", 'https://maps.googleapis.com', 'https://maps.gstatic.com', "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
       objectSrc: ["'none'"]
     }
   },

@@ -3,18 +3,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import api, { API_BASE_URL } from '../api';
-
-
-const carIcon = new L.DivIcon({
-  html: '<div style="font-size: 30px; line-height: 30px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.3));">🚗</div>',
-  className: 'custom-car-icon',
-  iconSize: [30, 30],
-  iconAnchor: [15, 15]
-});
+import MapView from './MapView';
 
 
 const CustomerDashboard = () => {
@@ -251,12 +241,15 @@ const CustomerDashboard = () => {
                                 
                                 {liveLocation ? (
                                   <div style={{ height: '350px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: '2px solid #FFD700', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}>
-                                    <MapContainer key={`${liveLocation.lat}-${liveLocation.lng}`} center={[liveLocation.lat, liveLocation.lng]} zoom={16} style={{ height: '100%', width: '100%' }}>
-                                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                                      <Marker position={[liveLocation.lat, liveLocation.lng]} icon={carIcon}>
-                                        <Popup>Your Kidza Driver is here!</Popup>
-                                      </Marker>
-                                    </MapContainer>
+                                    <MapView
+                                      center={{ lat: liveLocation.lat, lng: liveLocation.lng }}
+                                      zoom={16}
+                                      markers={[{
+                                        position: { lat: liveLocation.lat, lng: liveLocation.lng },
+                                        emoji: '🚗',
+                                        popup: 'Your Kidza Driver is here!'
+                                      }]}
+                                    />
                                   </div>
                                 ) : (
                                   <div style={{ padding: '30px', backgroundColor: '#F3F4F6', borderRadius: '12px', textAlign: 'center', color: '#6B7280', fontStyle: 'italic' }}>

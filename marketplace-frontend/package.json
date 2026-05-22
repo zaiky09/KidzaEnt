@@ -13,11 +13,10 @@
     "icons": "node scripts/generate-pwa-icons.cjs"
   },
   "dependencies": {
+    "@vis.gl/react-google-maps": "^1.8.3",
     "axios": "^1.13.6",
-    "leaflet": "^1.9.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.13.1",
     "socket.io-client": "^4.8.3"
   },
