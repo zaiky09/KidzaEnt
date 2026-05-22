@@ -9,8 +9,12 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFiles": ["<rootDir>/backend/tests/setup.js"],
-    "testMatch": ["<rootDir>/backend/tests/**/*.test.js"],
+    "setupFiles": [
+      "<rootDir>/backend/tests/setup.js"
+    ],
+    "testMatch": [
+      "<rootDir>/backend/tests/**/*.test.js"
+    ],
     "testTimeout": 30000
   },
   "keywords": [],
@@ -28,6 +32,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.0",
     "nodemailer": "^8.0.4",
+    "pdfkit": "^0.18.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {

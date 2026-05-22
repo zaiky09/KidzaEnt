@@ -3,6 +3,7 @@ const router = express.Router();
 const Order = require('../models/Order');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { initiateStkPush, parseCallback } = require('../utils/daraja');
+const { sendReceiptEmail } = require('../utils/receiptEmail');
 
 // 1. Customer initiates M-Pesa STK Push for an existing pending order.
 // The frontend creates the order first via POST /api/orders, then calls this
@@ -67,17 +68,29 @@ router.post('/callback', async (req, res) => {
       return res.json({ ResultCode: 0, ResultDesc: 'Already processed' });
     }
 
+    let sendReceipt = false;
     if (parsed.success) {
       order.paymentStatus = 'completed';
       order.mpesaReceiptNumber = parsed.receiptNumber;
       order.mpesaResultDesc = parsed.resultDesc;
+      sendReceipt = true;
     } else {
       order.paymentStatus = 'failed';
       order.mpesaResultDesc = parsed.resultDesc;
     }
     await order.save();
 
+    // Acknowledge Safaricom first, then send the receipt in the background.
+    // sendReceiptEmail is fire-and-forget — if email is down, the payment
+    // record on our side is still committed.
     res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+
+    if (sendReceipt) {
+      const populated = await Order.findById(order._id)
+        .populate('items.item', 'name price')
+        .populate('customerId', 'username email');
+      sendReceiptEmail(populated); // intentionally not awaited
+    }
   } catch (err) {
     console.error('Daraja callback handler error:', err);
     // Still 200 — anything else triggers retries.
