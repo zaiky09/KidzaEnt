@@ -12,16 +12,16 @@ const DriverDashboard = () => {
   const [error, setError] = useState('');
   const [sharingOrderId, setSharingOrderId] = useState(null);
 
-  // Refs so we can clean up the socket connection and the GPS interval on unmount.
+  // Refs so we can clean up the socket connection and the GPS watch on unmount.
   const socketRef = useRef(null);
-  const intervalRef = useRef(null);
+  const watchIdRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
     socketRef.current = io(API_BASE_URL, { auth: { token } });
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
       socketRef.current?.disconnect();
     };
   }, []);
@@ -51,30 +51,51 @@ const DriverDashboard = () => {
     fetchData();
   }, []);
 
+  const stopSharingLocation = () => {
+    if (watchIdRef.current != null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setSharingOrderId(null);
+  };
+
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       await api.put(`/api/orders/${orderId}/status`, { status: newStatus });
-      if (newStatus === 'delivered' && intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-        setSharingOrderId(null);
-      }
+      if (newStatus === 'delivered') stopSharingLocation();
       fetchData();
     } catch {
       alert('Failed to update status.');
     }
   };
 
-  const startSharingLocation = (orderId, startLat, startLng) => {
-    if (intervalRef.current) clearInterval(intervalRef.current); // never run two intervals at once
+  const startSharingLocation = (orderId) => {
+    if (!navigator.geolocation) {
+      alert("Geolocation isn't available on this device.");
+      return;
+    }
+    // Never run two watchers at once.
+    if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
     setSharingOrderId(orderId);
-    let currentLat = startLat || -1.286389;
-    let currentLng = startLng || 36.817223;
-    alert('Live tracking active!');
-    intervalRef.current = setInterval(() => {
-      currentLat += 0.0002; currentLng += 0.0002;
-      socketRef.current?.emit('driver_location_update', { orderId, location: { lat: currentLat, lng: currentLng } });
-    }, 2000);
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        socketRef.current?.emit('driver_location_update', {
+          orderId,
+          location: { lat: position.coords.latitude, lng: position.coords.longitude }
+        });
+      },
+      (err) => {
+        console.error('GPS error:', err);
+        alert(`GPS error: ${err.message}. Make sure you've allowed location access.`);
+        stopSharingLocation();
+      },
+      {
+        enableHighAccuracy: true,   // request best fix the device can give
+        maximumAge: 5000,           // accept cached fixes ≤5s old
+        timeout: 30000              // give the OS 30s to produce a fix
+      }
+    );
   };
 
   const getStatusBadge = (status) => {
@@ -165,7 +186,7 @@ const DriverDashboard = () => {
              )}
              {order.status === 'in_transit' && (
                <>
-                 <button onClick={() => startSharingLocation(order._id, order.dropoffLat, order.dropoffLng)} className="btn-primary" style={{ flex: 1, backgroundColor: sharingOrderId === order._id ? '#10B981' : '#111827' }}>
+                 <button onClick={() => startSharingLocation(order._id)} className="btn-primary" style={{ flex: 1, backgroundColor: sharingOrderId === order._id ? '#10B981' : '#111827' }}>
                     {sharingOrderId === order._id ? '📡 Sharing GPS' : '📍 Share Location'}
                  </button>
                  <button onClick={() => updateOrderStatus(order._id, 'delivered')} className="btn-primary" style={{ flex: 1 }}>Complete Delivery</button>
