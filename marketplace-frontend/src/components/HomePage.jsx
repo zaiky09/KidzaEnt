@@ -84,7 +84,7 @@ const HomePage = () => {
         </div>
 
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '30px' }}>
           
           {/* Feature 1 */}
           <div className="glass-card" style={{ padding: '40px 30px', textAlign: 'center' }}>

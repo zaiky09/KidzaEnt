@@ -219,7 +219,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* LISTING WITH CATEGORY BADGE */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px, 100%), 1fr))', gap: '20px' }}>
             {catalogItems.map(item => (
               <div key={item._id} className="glass-card" style={{ padding: '20px', display: 'flex', gap: '15px', alignItems: 'center' }}>
                 <img src={item.images?.[0] || 'https://placehold.co/60?text=No+Img'} alt="" style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />
@@ -276,7 +276,7 @@ const AdminDashboard = () => {
             <input className="input-modern" style={{ flex: 2 }} placeholder="Search name, phone, or email..." value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '25px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))', gap: '25px' }}>
             {filteredUsers.map(user => {
               const isDriver = user.role === 'driver';
               const isVerified = !isDriver || user.isApproved;

@@ -11,10 +11,15 @@
   font-family: 'Poppins', sans-serif; /* The premium font! */
 }
 
-body {
+html, body {
   background-color: #F9FAFB; /* Soft, clean off-white */
   color: #111827; /* Near-black for softer reading */
   -webkit-font-smoothing: antialiased;
+  /* Belt-and-braces: catch any rogue element wider than the viewport. The
+     real fix is in the component, but this stops a horizontal scrollbar
+     from appearing while we hunt them down. */
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* 2. Premium Shadows & Cards */
@@ -72,9 +77,56 @@ body {
   box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.1);
 }
 
+/* Images should never overflow their container */
+img { max-width: 100%; height: auto; }
+
 /* Smooth scrolling for the whole app */
-html {
-  scroll-behavior: smooth;
+html { scroll-behavior: smooth; }
+
+/* ==========================================
+   5. Mobile-specific overrides
+   ========================================== */
+@media (max-width: 600px) {
+  /* Navbar: tighten padding and shrink logo so all links fit on a phone */
+  nav {
+    padding: 6px 12px !important;
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+  nav img[alt="Kidza"] {
+    height: 44px !important;
+  }
+  nav a {
+    margin: 0 6px !important;
+    font-size: 13px !important;
+  }
+  nav a.btn-primary {
+    padding: 8px 14px !important;
+    font-size: 13px !important;
+  }
+
+  /* Chatbot: smaller bubble so it doesn't cover Pay/Submit buttons,
+     and a chat window sized to fit any phone viewport. */
+  .chatbot-bubble {
+    width: 48px !important;
+    height: 48px !important;
+    bottom: 14px !important;
+    right: 14px !important;
+  }
+  .chatbot-bubble span {
+    font-size: 22px !important;
+  }
+  .chatbot-window {
+    bottom: 72px !important;
+    right: 10px !important;
+    left: 10px !important;
+    width: auto !important;
+    max-height: calc(100vh - 96px) !important;
+  }
+
+  /* The CartPage's right column has minmax(350px, 1fr) — too wide for
+     narrow phones. Override the grid template to a single column. */
+  .responsive-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
-
-

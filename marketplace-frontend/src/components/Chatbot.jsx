@@ -49,8 +49,9 @@ const Chatbot = () => {
   return (
     <>
       {/* --- THE FLOATING BUBBLE --- */}
-      <div 
+      <div
         onClick={toggleChat}
+        className="chatbot-bubble"
         style={{ position: 'fixed', bottom: '20px', right: '20px', width: '60px', height: '60px', backgroundColor: '#FFD700', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 9999, transition: 'transform 0.2s' }}
         onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
         onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -60,7 +61,7 @@ const Chatbot = () => {
 
       {/* --- THE CHAT WINDOW --- */}
       {isOpen && (
-        <div style={{ position: 'fixed', bottom: '90px', right: '20px', width: '320px', height: '450px', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', border: '2px solid #FFD700', display: 'flex', flexDirection: 'column', zIndex: 9999, overflow: 'hidden' }}>
+        <div className="chatbot-window" style={{ position: 'fixed', bottom: '90px', right: '20px', width: '320px', height: '450px', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', border: '2px solid #FFD700', display: 'flex', flexDirection: 'column', zIndex: 9999, overflow: 'hidden' }}>
           
           {/* Header */}
           <div style={{ backgroundColor: '#FFD700', padding: '15px', color: '#000', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

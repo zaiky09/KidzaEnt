@@ -161,7 +161,7 @@ const CartPage = () => {
           <button onClick={() => navigate('/')} className="btn-primary">Browse Catalog</button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '30px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: '30px' }}>
           
           {/* --- LEFT COLUMN: CART ITEMS --- */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>

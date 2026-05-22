@@ -188,7 +188,7 @@ const CatalogPage = () => {
       {loading ? (
         <p style={{ textAlign: 'center' }}>Loading Catalog...</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '30px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: '30px' }}>
           {displayedItems.length === 0 ? (
             <p style={{ gridColumn: '1/-1', textAlign: 'center', padding: '50px', color: '#9CA3AF' }}>No items found in this category.</p>
           ) : (
