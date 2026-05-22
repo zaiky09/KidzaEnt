@@ -8,6 +8,8 @@ import { Link } from 'react-router-dom';
 const HomePage = () => {
   // NEW: Check if the user is currently logged in!
   const isLoggedIn = !!localStorage.getItem('token');
+  const username = isLoggedIn ? localStorage.getItem('username') : null;
+  const firstName = username ? username.split(' ')[0] : null;
 
 
   return (
@@ -24,12 +26,17 @@ const HomePage = () => {
         borderBottom: '4px solid #FFD700'
       }}>
         <div style={{ maxWidth: '800px' }}>
-          <h1 style={{ 
+          {firstName && (
+            <p style={{ color: '#FFD700', fontSize: '1rem', fontWeight: 600, marginBottom: '16px', letterSpacing: '0.04em' }}>
+              👋 Welcome back, {firstName}
+            </p>
+          )}
+          <h1 style={{
             fontSize: 'clamp(2.5rem, 5vw, 4rem)',
-            fontWeight: '800', 
-            color: '#FFFFFF', 
+            fontWeight: '800',
+            color: '#FFFFFF',
             lineHeight: '1.2',
-            marginBottom: '24px' 
+            marginBottom: '24px'
           }}>
             Everything You Need.<br/>
             <span style={{ color: '#FFD700' }}>Delivered Instantly.</span>

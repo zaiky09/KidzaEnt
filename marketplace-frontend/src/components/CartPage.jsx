@@ -200,7 +200,15 @@ const CartPage = () => {
         <h2 style={{ fontSize: '2.5rem', fontWeight: '700', color: '#111827', marginBottom: '10px' }}>
           Secure <span style={{ color: '#F5B041' }}>Checkout</span> 🛒
         </h2>
-        <p style={{ fontSize: '1.1rem', color: '#6B7280' }}>Review your items and enter delivery details.</p>
+        <p style={{ fontSize: '1.1rem', color: '#6B7280' }}>
+          {(() => {
+            const username = typeof window !== 'undefined' ? localStorage.getItem('username') : null;
+            const firstName = username ? username.split(' ')[0] : null;
+            return firstName
+              ? <>Almost there, <strong style={{ color: '#111827' }}>{firstName}</strong>! Review your items and enter delivery details.</>
+              : 'Review your items and enter delivery details.';
+          })()}
+        </p>
       </div>
 
 

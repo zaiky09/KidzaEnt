@@ -12,12 +12,16 @@ const Navbar = () => {
 
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('role');
+  const username = localStorage.getItem('username');
+  // First name only — keeps the navbar tidy and feels friendlier.
+  const firstName = username ? username.split(' ')[0] : null;
   const { cartItemCount } = useContext(CartContext);
 
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('username');
     navigate('/'); // Redirect to Home Page
   };
 
@@ -71,6 +75,16 @@ const Navbar = () => {
         {/* 2. LOGGED IN USERS */}
         {token && (
           <>
+            {/* Personalized greeting — only render when we have a name. */}
+            {firstName && (
+              <span
+                style={{ color: '#FFD700', marginRight: '14px', fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap' }}
+                title={username}
+              >
+                Hi, {firstName} 👋
+              </span>
+            )}
+
             {/* Catalog: Only visible to Customers and Admins */}
             {(role === 'customer' || role === 'admin') && (
               <Link to="/catalog" style={navLinkStyle('/catalog')}>Catalog</Link>

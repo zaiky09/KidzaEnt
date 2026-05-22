@@ -17,6 +17,12 @@ const CustomerDashboard = () => {
   const [etaInfo, setEtaInfo] = useState(null); // { durationText, distanceText, durationSec }
   const [reviewingItem, setReviewingItem] = useState(null); // catalog item being reviewed
   const [savingReview, setSavingReview] = useState(false);
+  const [resendingId, setResendingId] = useState(null);     // orderId currently being resent
+  const [resendMessage, setResendMessage] = useState(null); // { tone: 'ok'|'err', text, orderId }
+
+  // First-name greeting from localStorage (set on login).
+  const username = typeof window !== 'undefined' ? localStorage.getItem('username') : null;
+  const firstName = username ? username.split(' ')[0] : null;
 
   const socketRef = useRef(null);
 
@@ -73,11 +79,25 @@ const CustomerDashboard = () => {
   };
 
   const handleResendReceipt = async (orderId) => {
+    setResendingId(orderId);
+    setResendMessage(null);
     try {
       const res = await api.post(`/api/payments/${orderId}/receipt/resend`);
-      alert(res.data?.message || 'Receipt sent. Check your email (and spam folder).');
+      setResendMessage({
+        tone: 'ok',
+        orderId,
+        text: res.data?.message || '✅ Receipt resent. Check your inbox (and spam folder).'
+      });
     } catch (err) {
-      alert(err?.response?.data?.message || 'Could not send receipt. Please try again.');
+      setResendMessage({
+        tone: 'err',
+        orderId,
+        text: err?.response?.data?.message || 'Could not send receipt. Try again in a minute.'
+      });
+    } finally {
+      setResendingId(null);
+      // Auto-hide so the toast doesn't linger if the user moves on.
+      setTimeout(() => setResendMessage((m) => (m?.orderId === orderId ? null : m)), 6000);
     }
   };
 
@@ -120,8 +140,13 @@ const CustomerDashboard = () => {
       
       {/* HEADER SECTION */}
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        {firstName && (
+          <p style={{ fontSize: '0.95rem', color: '#6B7280', margin: '0 0 6px 0' }}>
+            Welcome back, <strong style={{ color: '#111827' }}>{firstName}</strong> 👋
+          </p>
+        )}
         <h2 style={{ fontSize: '2.5rem', fontWeight: '700', color: '#111827', marginBottom: '10px' }}>
-          My <span style={{ color: '#F5B041' }}>Orders</span>
+          {firstName ? `${firstName}'s` : 'My'} <span style={{ color: '#F5B041' }}>Orders</span>
         </h2>
         <p style={{ fontSize: '1.1rem', color: '#6B7280' }}>Track your deliveries and view order history.</p>
       </div>
@@ -208,8 +233,31 @@ const CustomerDashboard = () => {
                           <div style={{ marginTop: '10px', textAlign: 'right' }}>
                             <button
                               onClick={() => handleResendReceipt(order._id)}
-                              style={{ background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.82rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
-                            >📧 Email me my receipt</button>
+                              disabled={resendingId === order._id}
+                              style={{
+                                background: 'none', border: 'none',
+                                color: resendingId === order._id ? '#9CA3AF' : '#3B82F6',
+                                fontSize: '0.82rem',
+                                cursor: resendingId === order._id ? 'wait' : 'pointer',
+                                textDecoration: 'underline', padding: 0
+                              }}
+                            >{resendingId === order._id ? '📧 Sending…' : '📧 Email me my receipt'}</button>
+
+                            {resendMessage?.orderId === order._id && (
+                              <div
+                                role="status"
+                                style={{
+                                  marginTop: '6px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  color: resendMessage.tone === 'ok' ? '#059669' : '#B91C1C',
+                                  background: resendMessage.tone === 'ok' ? '#ECFDF5' : '#FEE2E2',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  display: 'inline-block'
+                                }}
+                              >{resendMessage.text}</div>
+                            )}
                           </div>
                         )}
                       </div>
