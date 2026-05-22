@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import api, { API_BASE_URL } from '../api';
 import MapView from './MapView';
+import ReviewModal from './ReviewModal';
 
 
 const CustomerDashboard = () => {
@@ -14,6 +15,8 @@ const CustomerDashboard = () => {
   const [trackingOrderId, setTrackingOrderId] = useState(null);
   const [liveLocation, setLiveLocation] = useState(null);
   const [etaInfo, setEtaInfo] = useState(null); // { durationText, distanceText, durationSec }
+  const [reviewingItem, setReviewingItem] = useState(null); // catalog item being reviewed
+  const [savingReview, setSavingReview] = useState(false);
 
   const socketRef = useRef(null);
 
@@ -57,6 +60,17 @@ const CustomerDashboard = () => {
     }
   };
 
+
+  const submitReview = async ({ rating, comment }) => {
+    if (!reviewingItem) return;
+    setSavingReview(true);
+    try {
+      await api.post(`/api/catalog/${reviewingItem._id}/reviews`, { rating, comment });
+      setReviewingItem(null);
+    } finally {
+      setSavingReview(false);
+    }
+  };
 
   const startTracking = (orderId) => {
     setTrackingOrderId(orderId);
@@ -150,9 +164,18 @@ const CustomerDashboard = () => {
                       <div style={{ backgroundColor: '#F3F4F6', borderRadius: '12px', padding: '15px', marginBottom: '20px' }}>
                         <ul style={{ listStyleType: 'none', padding: 0, margin: 0, fontSize: '0.95rem', color: '#4B5563' }}>
                           {order.items && order.items.map((lineItem, index) => (
-                            <li key={index} style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                              <span>• <strong>{lineItem.item ? lineItem.item.name : 'Deleted Item'}</strong></span>
+                            <li key={index} style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ flex: 1 }}>• <strong>{lineItem.item ? lineItem.item.name : 'Deleted Item'}</strong></span>
                               <span style={{ fontWeight: '600' }}>Qty: {lineItem.quantity}</span>
+                              {order.status === 'delivered' && lineItem.item && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewingItem(lineItem.item)}
+                                  style={{ background: 'none', border: '1px solid #F5B041', color: '#92400E', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                  ★ Review
+                                </button>
+                              )}
                             </li>
                           ))}
                         </ul>
@@ -298,6 +321,14 @@ const CustomerDashboard = () => {
         </div>
       )}
 
+
+      <ReviewModal
+        key={reviewingItem?._id || 'closed'}
+        item={reviewingItem}
+        saving={savingReview}
+        onClose={() => setReviewingItem(null)}
+        onSubmit={submitReview}
+      />
 
       {/* Tiny bit of inline CSS for animations */}
       <style>{`

@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { CartContext } from '../context/CartContext';
 import sharedCategories from '../../../shared/categories.json';
+import StarRating from './StarRating';
+
+const averageRating = (reviews) => {
+  if (!reviews || reviews.length === 0) return 0;
+  const sum = reviews.reduce((acc, r) => acc + (r.rating || 0), 0);
+  return sum / reviews.length;
+};
 
 const CatalogPage = () => {
   const navigate = useNavigate();
@@ -206,7 +213,15 @@ const CatalogPage = () => {
                 </div>
                 <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <h3 style={{ fontSize: '1.2rem', marginBottom: '5px' }}>{item.name}</h3>
-                  <p style={{ color: '#10B981', fontWeight: '800', fontSize: '1.3rem', marginBottom: '10px' }}>KES {item.price}</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <p style={{ margin: 0, color: '#10B981', fontWeight: '800', fontSize: '1.3rem' }}>KES {item.price}</p>
+                    {item.reviews && item.reviews.length > 0 && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: '#6B7280' }}>
+                        <StarRating rating={averageRating(item.reviews)} size={14} />
+                        <span>({item.reviews.length})</span>
+                      </span>
+                    )}
+                  </div>
                   <p style={{ fontSize: '0.9rem', color: '#6B7280', flex: 1 }}>{item.description}</p>
                   
                   {(() => {

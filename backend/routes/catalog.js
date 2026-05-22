@@ -103,11 +103,56 @@ router.delete('/:id', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const deletedItem = await CatalogItem.findByIdAndDelete(req.params.id);
     if (!deletedItem) return res.status(404).json({ message: 'Item not found.' });
-    
+
     res.json({ message: 'Item deleted successfully.' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error while deleting the item.' });
+  }
+});
+
+// 6. POST / UPDATE A REVIEW (only customers who received the item)
+// One review per customer per item — re-posting updates the existing one.
+const Order = require('../models/Order');
+router.post('/:id/reviews', verifyToken, async (req, res) => {
+  try {
+    const { rating, comment } = req.body || {};
+    const itemId = req.params.id;
+    const userId = req.user.userId;
+
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be a number between 1 and 5.' });
+    }
+    if (comment && typeof comment !== 'string') {
+      return res.status(400).json({ message: 'Comment must be a string.' });
+    }
+
+    // Must have a delivered order containing this item.
+    const hasDelivered = await Order.exists({
+      customerId: userId,
+      status: 'delivered',
+      'items.item': itemId
+    });
+    if (!hasDelivered) {
+      return res.status(403).json({ message: 'You can only review items you have received.' });
+    }
+
+    const item = await CatalogItem.findById(itemId);
+    if (!item) return res.status(404).json({ message: 'Item not found.' });
+
+    const existingIdx = item.reviews.findIndex((r) => r.customerId?.toString() === userId);
+    if (existingIdx >= 0) {
+      item.reviews[existingIdx].rating = rating;
+      item.reviews[existingIdx].comment = comment || '';
+      item.reviews[existingIdx].createdAt = new Date();
+    } else {
+      item.reviews.push({ customerId: userId, rating, comment: comment || '' });
+    }
+    await item.save();
+    res.json({ message: 'Review saved.', reviewsCount: item.reviews.length });
+  } catch (error) {
+    console.error('Review save error:', error);
+    res.status(500).json({ message: 'Server error saving review.' });
   }
 });
 
