@@ -6,6 +6,7 @@ const User = require('../models/User');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { computeDeliveryFee } = require('../utils/deliveryFee');
 const { getSettings } = require('../utils/settings');
+const { sendDeliveryConfirmationEmail } = require('../utils/deliveryEmail');
 
 // Helper: push a status change to the relevant per-user Socket.IO rooms so
 // customers and drivers see the new state without a reload. Populates the
@@ -254,6 +255,18 @@ router.put('/:id/status', verifyToken, async (req, res) => {
     // Push the change to the customer (always) and assigned driver
     // (if any) so their dashboards reflect the new state without a reload.
     await broadcastOrderStatus(req, order);
+
+    // Delivery confirmation email — fire-and-forget so SMTP latency
+    // doesn't block the driver's "Complete Delivery" tap. Errors logged
+    // in Render so they're discoverable but don't fail the request.
+    if (nextStatus === 'delivered') {
+      Order.findById(order._id)
+        .populate('items.item', 'name')
+        .populate('customerId', 'username email')
+        .populate('driverId', 'username')
+        .then((populated) => sendDeliveryConfirmationEmail(populated))
+        .catch((err) => console.error('[delivery-email] send failed:', err.message));
+    }
 
     res.json(order);
   } catch (error) {
