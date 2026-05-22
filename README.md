@@ -138,18 +138,51 @@ JWT-based authentication with bcrypt-hashed passwords. Separate flows for buyers
 ### 📧 Transactional Email
 Order confirmations and account notifications via Nodemailer.
 
+### 📱 Installable as a mobile app (PWA)
+The frontend is a Progressive Web App — users can install it to their phone home screen and it launches full-screen, no browser chrome. See [Install on a phone](#install-on-a-phone) below.
+
+---
+
+## Install on a phone
+
+The web app can be installed to a phone's home screen and runs full-screen like a native app. No app store needed.
+
+### Android (Chrome)
+1. Open the site in Chrome
+2. Either tap the **Install app** banner that appears, or open Chrome's menu (⋮) → **Install app** / **Add to Home screen**
+3. Confirm — a Kidza icon lands on your home screen
+
+### iOS (Safari, iOS 16.4+)
+1. Open the site in Safari (Chrome on iOS won't work — Apple restricts PWAs to Safari)
+2. Tap the **Share** button (square with arrow up)
+3. Scroll down and tap **Add to Home Screen**
+4. Confirm — a Kidza icon lands on your home screen
+
+### Desktop (Chrome, Edge, Brave)
+Look for the install icon in the address bar (a small computer/download icon). Click it.
+
+### Regenerating PWA icons
+If you change `src/assets/Kidza.png` and want the icons refreshed:
+```bash
+cd marketplace-frontend
+npm run icons   # regenerates icon-192.png, icon-512.png, icon-512-maskable.png, apple-touch-icon.png
+```
+
 ---
 
 ## Roadmap
 
-- [ ] Complete buyer and seller flows
-- [ ] Cart and checkout
-- [ ] Payment integration
+- [x] Buyer, driver, and admin flows
+- [x] Cart and checkout
+- [x] **M-Pesa Daraja STK Push** (sandbox verified end-to-end)
+- [x] Order management dashboard (Admin Panel)
+- [x] Automated tests (46 — backend Jest + frontend Vitest)
+- [x] CI on every push (GitHub Actions)
+- [x] Installable PWA
 - [ ] Migrate trip tracking from raw Geolocation to **Google Maps API** (routing, place data, ETA)
-- [ ] Order management dashboard
-- [ ] Mobile-responsive polish
-- [ ] Deployment (frontend + backend)
-- [ ] Automated tests
+- [ ] Production deployment (frontend + backend)
+- [ ] Go-live with real Safaricom paybill (production Daraja credentials)
+- [ ] Native React Native app for Google Play + App Store
 
 ---
 
