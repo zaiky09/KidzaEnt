@@ -1,63 +1,75 @@
-// Address autocomplete bound to a styled <input>. Uses Google's Places
-// JS library, restricted to addresses inside Kenya (country=ke). On select,
-// reports the human-readable address plus exact lat/lng — so the cart can
-// fill the delivery address AND set dropoff coordinates from a single field.
+// Address autocomplete using the new google.maps.places.PlaceAutocompleteElement
+// web component. The legacy google.maps.places.Autocomplete class is not
+// available to GCP projects created after 2025-03-01, so we use this one.
 //
-// Notes:
-// - We use the legacy `google.maps.places.Autocomplete` because it works
-//   with any plain <input>. The newer `PlaceAutocompleteElement` is a web
-//   component with its own styling that wouldn't match our .input-modern.
+// The new element is a Custom Element with shadow DOM that draws its own
+// input + suggestion dropdown. We give it a className so it inherits our
+// .input-modern styling; the dropdown panel is styled by Google.
+//
+// Events:
+// - "gmp-select" fires when the user picks a suggestion. We resolve the
+//   Place reference into formattedAddress + location and pass that up.
 
 import { useEffect, useRef } from 'react';
 import { useMapsLibrary } from '@vis.gl/react-google-maps';
 
 const PlaceAutocomplete = ({
-  value,
-  onChange,                // (text) — fired on every keystroke
   onPlaceSelected,         // ({ address, lat, lng }) — fired when user picks a suggestion
-  placeholder,
+  onTextChange,            // (text) — fired as the user types
+  placeholder = 'Start typing an address…',
   className = 'input-modern',
   style
 }) => {
-  const inputRef = useRef(null);
-  const autocompleteRef = useRef(null);
+  const containerRef = useRef(null);
+  const elementRef = useRef(null);
   const places = useMapsLibrary('places');
 
   useEffect(() => {
-    if (!places || !inputRef.current) return;
+    if (!places || !containerRef.current) return;
 
-    autocompleteRef.current = new places.Autocomplete(inputRef.current, {
-      componentRestrictions: { country: 'ke' },
-      fields: ['formatted_address', 'geometry', 'name'],
-      types: ['geocode'] // street addresses and admin areas
+    const el = new places.PlaceAutocompleteElement({
+      componentRestrictions: { country: 'ke' }
     });
+    el.className = className;
+    if (style) Object.assign(el.style, style);
 
-    const listener = autocompleteRef.current.addListener('place_changed', () => {
-      const place = autocompleteRef.current.getPlace();
-      if (!place?.geometry?.location) return;
+    containerRef.current.replaceChildren(el);
+    elementRef.current = el;
 
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-      const address = place.formatted_address || place.name || '';
-      onPlaceSelected?.({ address, lat, lng });
-      onChange?.(address);
-    });
+    const onSelect = async (event) => {
+      try {
+        const place = event.placePrediction.toPlace();
+        await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+        const address = place.formattedAddress || place.displayName || '';
+        onPlaceSelected?.({
+          address,
+          lat: place.location.lat(),
+          lng: place.location.lng()
+        });
+        onTextChange?.(address);
+      } catch (err) {
+        console.error('PlaceAutocomplete select error:', err);
+      }
+    };
 
-    return () => listener?.remove();
-  }, [places, onChange, onPlaceSelected]);
+    // The web component bubbles 'input' events from its internal text field.
+    const onInput = (event) => {
+      const v = event.target?.value ?? '';
+      onTextChange?.(v);
+    };
 
-  return (
-    <input
-      ref={inputRef}
-      type="text"
-      className={className}
-      style={style}
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange?.(e.target.value)}
-      autoComplete="off"
-    />
-  );
+    el.addEventListener('gmp-select', onSelect);
+    el.addEventListener('input', onInput);
+
+    return () => {
+      el.removeEventListener('gmp-select', onSelect);
+      el.removeEventListener('input', onInput);
+      el.remove();
+      elementRef.current = null;
+    };
+  }, [places, onPlaceSelected, onTextChange, className, style]);
+
+  return <div ref={containerRef} data-placeholder={placeholder} style={{ width: '100%' }} />;
 };
 
 export default PlaceAutocomplete;

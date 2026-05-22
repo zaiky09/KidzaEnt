@@ -273,8 +273,7 @@ const CartPage = () => {
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '0.85rem', color: '#374151' }}>Delivery Address / Apartment</label>
                 <PlaceAutocomplete
-                  value={deliveryAddress}
-                  onChange={setDeliveryAddress}
+                  onTextChange={setDeliveryAddress}
                   onPlaceSelected={({ address, lat, lng }) => {
                     setDeliveryAddress(address);
                     setDropoffLat(lat);

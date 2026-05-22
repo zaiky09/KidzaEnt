@@ -16,19 +16,38 @@ const ALLOWED_TRANSITIONS = {
 
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { items, expectedDeliveryDate, deliveryAddress, customerPhone, dropoffLat, dropoffLng } = req.body; 
+    const { items, expectedDeliveryDate, deliveryAddress, customerPhone, dropoffLat, dropoffLng } = req.body;
+
+    // Validate upfront so we return a clear 400 instead of a Mongoose ValidationError as a 500.
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Cart is empty.' });
+    }
+    if (typeof dropoffLat !== 'number' || typeof dropoffLng !== 'number') {
+      return res.status(400).json({ message: 'Dropoff coordinates are required. Use the address autocomplete or "Get My Location".' });
+    }
+    if (!deliveryAddress || !customerPhone || !expectedDeliveryDate) {
+      return res.status(400).json({ message: 'Address, phone, and delivery date are all required.' });
+    }
 
     let grandTotal = 0;
     let totalWeight = 0;
+    const missing = [];
 
-    for (let cartItem of items) {
+    for (const cartItem of items) {
       const catalogItem = await CatalogItem.findById(cartItem.item);
-      if (catalogItem) {
-        grandTotal += catalogItem.price * cartItem.quantity;
-        if (catalogItem.type === 'product') {
-          totalWeight += catalogItem.weightPerItemKg * cartItem.quantity;
-        }
+      if (!catalogItem) {
+        missing.push(cartItem.item);
+        continue;
       }
+      const qty = Number(cartItem.quantity) || 0;
+      grandTotal += catalogItem.price * qty;
+      // weightPerItemKg may be undefined on services or older items — treat as 0.
+      if (catalogItem.type === 'product') {
+        totalWeight += (Number(catalogItem.weightPerItemKg) || 0) * qty;
+      }
+    }
+    if (missing.length) {
+      return res.status(400).json({ message: 'Some cart items no longer exist. Clear the cart and try again.', missing });
     }
 
     const newOrder = new Order({
@@ -46,7 +65,22 @@ router.post('/', verifyToken, async (req, res) => {
     await newOrder.save();
     res.status(201).json(newOrder);
   } catch (error) {
-    res.status(500).json({ message: 'Server error placing order.' });
+    // Log the real error so we can debug from Render logs.
+    console.error('Order placement error:', error);
+
+    // Mongoose ValidationError → 400 with the offending fields, not a generic 500.
+    if (error.name === 'ValidationError') {
+      const fields = Object.keys(error.errors || {});
+      return res.status(400).json({
+        message: 'Order validation failed.',
+        fields,
+        details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+      });
+    }
+    res.status(500).json({
+      message: 'Server error placing order.',
+      details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+    });
   }
 });
 
