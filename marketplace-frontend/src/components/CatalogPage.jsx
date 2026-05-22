@@ -57,7 +57,7 @@ const CatalogPage = () => {
   }, [items, activeTab, selectedCategory, aiResults]);
 
   const handleQuantityChange = (itemId, value) => {
-    setQuantities({ ...quantities, [itemId]: value });
+    setQuantities({ ...quantities, [itemId]: Number(value) });
   };
 
   const handleAddToCart = (item) => {
@@ -209,18 +209,32 @@ const CatalogPage = () => {
                   <p style={{ color: '#10B981', fontWeight: '800', fontSize: '1.3rem', marginBottom: '10px' }}>KES {item.price}</p>
                   <p style={{ fontSize: '0.9rem', color: '#6B7280', flex: 1 }}>{item.description}</p>
                   
-                  <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <input
-                      type="number"
-                      className="input-modern"
-                      style={{ width: '70px' }}
-                      value={quantities[item._id] || 1}
-                      onChange={(e) => handleQuantityChange(item._id, e.target.value)}
-                    />
-                    <button onClick={() => handleAddToCart(item)} className="btn-primary" style={{ flex: 1 }}>
-                      {addedItemId === item._id ? 'Added!' : '🛒 Add'}
-                    </button>
-                  </div>
+                  {(() => {
+                    const step = item.type === 'product' ? 0.5 : 1;
+                    const qty = quantities[item._id] ?? 1;
+                    return (
+                      <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(item._id, Math.max(step, qty - step))}
+                          aria-label="Decrease quantity"
+                          style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #D1D5DB', backgroundColor: '#FFF', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', flexShrink: 0 }}
+                        >−</button>
+                        <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: '700', fontSize: '0.95rem' }}>
+                          {qty}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(item._id, qty + step)}
+                          aria-label="Increase quantity"
+                          style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid #D1D5DB', backgroundColor: '#FFF', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', flexShrink: 0 }}
+                        >+</button>
+                        <button onClick={() => handleAddToCart(item)} className="btn-primary" style={{ flex: 1, marginLeft: '4px' }}>
+                          {addedItemId === item._id ? 'Added!' : '🛒 Add'}
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ))
