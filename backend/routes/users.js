@@ -2,8 +2,21 @@ const express = require('express');
 const User = require('../models/User');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
 
 const router = express.Router();
+
+// Shared mailer for driver-status notifications.
+const mailer = nodemailer.createTransport({
+  service: process.env.EMAIL_SERVICE || 'gmail',
+  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+});
+
+// Same regexes the frontend uses, so a tampered/curl request hits the same wall.
+const NATIONAL_ID_RE = /^\d{7,9}$/;
+const LICENSE_RE = /^[A-Z0-9]{5,15}$/i;
+const VEHICLE_REG_RE = /^K[A-Z]{2}\s?\d{3}[A-Z]$/i;
+const URL_RE = /^https:\/\/.+\..+/;
 
 // ==========================================
 // DRIVER ROUTES (Token required, but not admin)
@@ -20,23 +33,32 @@ router.get('/me', verifyToken, async (req, res) => {
   }
 });
 
-// 2. Complete Driver Profile (KYC)
+// 2. Complete Driver Profile (KYC). Validates server-side so curl can't
+// bypass the frontend rules.
 router.put('/complete-profile', verifyToken, async (req, res) => {
   try {
-    // Only allow drivers to access this specific logic
     if (req.user.role !== 'driver') {
       return res.status(403).json({ message: 'Only drivers can submit compliance profiles.' });
     }
 
+    const allowedFields = ['nationalId', 'idPhoto', 'licenseNumber', 'licensePhoto', 'vehicleReg', 'vehicleType', 'vehicleColor', 'profilePhoto'];
+    const d = {};
+    for (const k of allowedFields) if (req.body?.[k] != null) d[k] = String(req.body[k]).trim();
+
+    if (!NATIONAL_ID_RE.test(d.nationalId || '')) return res.status(400).json({ message: 'National ID must be 7–9 digits.' });
+    if (!LICENSE_RE.test(d.licenseNumber || '')) return res.status(400).json({ message: 'License number must be 5–15 letters/digits.' });
+    if (!VEHICLE_REG_RE.test((d.vehicleReg || '').replace(/\s+/g, ' '))) return res.status(400).json({ message: 'Vehicle registration should look like "KCA 123X".' });
+    if (!d.vehicleColor) return res.status(400).json({ message: 'Vehicle color is required.' });
+    if (!URL_RE.test(d.idPhoto || '')) return res.status(400).json({ message: 'National ID photo upload is required.' });
+    if (!URL_RE.test(d.licensePhoto || '')) return res.status(400).json({ message: 'License photo upload is required.' });
+    if (d.profilePhoto && !URL_RE.test(d.profilePhoto)) return res.status(400).json({ message: 'Profile photo URL is invalid.' });
+
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ message: 'User not found.' });
 
-    // Update details and flip the completion flag
-    user.driverDetails = req.body;
+    user.driverDetails = d;
     user.isProfileComplete = true;
-
-    //Saftey: Reset approval so admin must re-verify changes
-    user.isApproved = false;
+    user.isApproved = false; // re-verification required after every edit
 
     await user.save();
     res.json({ message: 'Profile submitted successfully! Waiting for admin approval.' });
@@ -50,19 +72,39 @@ router.put('/complete-profile', verifyToken, async (req, res) => {
 // ADMIN ROUTES (Token AND Admin role required)
 // ==========================================
 
-// 2. Approve/Reject Driver
+// 2. Approve/Reject Driver. On status change, email the driver
+// (best-effort — failure to send email never blocks the DB write).
 router.put('/:id/approve', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found.' });
 
-
-    user.isApproved = req.body.isApproved;
+    const previousState = !!user.isApproved;
+    user.isApproved = !!req.body.isApproved;
     await user.save();
 
+    // Only notify on actual state change.
+    if (user.role === 'driver' && user.email && previousState !== user.isApproved) {
+      const subject = user.isApproved ? 'You are approved as a Kidza driver' : 'Update on your Kidza driver application';
+      const html = user.isApproved
+        ? `<p>Hi ${user.username},</p>
+           <p>Welcome aboard 🚗 — your Kidza driver application has been approved. You can start accepting delivery requests right away.</p>
+           <p>Log in at <a href="${process.env.FRONTEND_URL || 'https://kidzaent.vercel.app'}/driver">your driver hub</a> to see available trips.</p>
+           <p style="color:#6B7280;font-size:13px;">If this wasn't you, please reply to this email immediately.</p>`
+        : `<p>Hi ${user.username},</p>
+           <p>Your Kidza driver status has been temporarily revoked. This usually means an admin needs to re-verify your documents.</p>
+           <p>Please update your KYC details at <a href="${process.env.FRONTEND_URL || 'https://kidzaent.vercel.app'}/driver">your driver hub</a> and resubmit.</p>`;
+      mailer.sendMail({
+        to: user.email,
+        from: `"Kidza Marketplace" <${process.env.EMAIL_USER}>`,
+        subject,
+        html
+      }).catch((err) => console.error('[driver-approval-email] failed:', err.message));
+    }
 
     res.json({ message: `Driver status updated to ${user.isApproved ? 'approved' : 'revoked'}.` });
   } catch (error) {
+    console.error('Approve driver error:', error);
     res.status(500).json({ message: 'Error updating approval status.' });
   }
 });
