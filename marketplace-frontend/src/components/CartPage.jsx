@@ -4,6 +4,7 @@ import { useContext, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { CartContext } from '../context/CartContext';
+import PlaceAutocomplete from './PlaceAutocomplete';
 
 // How long to keep polling for the STK-push outcome before showing a timeout
 // message. Daraja typically resolves in 5-20s; we go a bit higher to be safe.
@@ -41,15 +42,31 @@ const CartPage = () => {
 
 
   const handleGetLocation = () => {
-    setLocationStatus('Locating...');
-    if (!navigator.geolocation) return setLocationStatus('Geolocation not supported.');
+    if (!navigator.geolocation) {
+      setLocationStatus('❌ Geolocation not supported.');
+      return;
+    }
+    setLocationStatus('📡 Locating… this can take up to 30s on first try.');
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setDropoffLat(position.coords.latitude);
         setDropoffLng(position.coords.longitude);
-        setLocationStatus('✅ Exact Location Captured!');
+        setLocationStatus(`✅ Captured (±${Math.round(position.coords.accuracy)}m accuracy)`);
       },
-      () => setLocationStatus('❌ Unable to retrieve location.')
+      (err) => {
+        // Browsers map kCLErrorLocationUnknown to code 2 (POSITION_UNAVAILABLE).
+        const reasons = {
+          1: '❌ Permission denied. Enable location in your browser settings and try again.',
+          2: '❌ Location currently unavailable. Move near a window or outdoors and retry.',
+          3: '❌ Timed out before a GPS fix. Try again.'
+        };
+        setLocationStatus(reasons[err.code] || `❌ ${err.message}`);
+      },
+      {
+        enableHighAccuracy: true,   // ask the OS for the best fix
+        maximumAge: 0,              // don't reuse a stale cached position
+        timeout: 30000              // wait up to 30s before failing
+      }
     );
   };
 
@@ -255,7 +272,20 @@ const CartPage = () => {
 
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '0.85rem', color: '#374151' }}>Delivery Address / Apartment</label>
-                <input type="text" required className="input-modern" placeholder="e.g. Westlands, 3rd Floor, Apt 4" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} />
+                <PlaceAutocomplete
+                  value={deliveryAddress}
+                  onChange={setDeliveryAddress}
+                  onPlaceSelected={({ address, lat, lng }) => {
+                    setDeliveryAddress(address);
+                    setDropoffLat(lat);
+                    setDropoffLng(lng);
+                    setLocationStatus(`✅ Address picked — coordinates set automatically.`);
+                  }}
+                  placeholder="Start typing a Kenyan address…"
+                />
+                <p style={{ margin: '4px 0 0 4px', fontSize: '0.75rem', color: '#6B7280' }}>
+                  Pick a suggestion to auto-set coordinates, or type a free-form address and use 📍 below.
+                </p>
               </div>
 
 

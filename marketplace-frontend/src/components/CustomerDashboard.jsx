@@ -13,6 +13,7 @@ const CustomerDashboard = () => {
   const [error, setError] = useState('');
   const [trackingOrderId, setTrackingOrderId] = useState(null);
   const [liveLocation, setLiveLocation] = useState(null);
+  const [etaInfo, setEtaInfo] = useState(null); // { durationText, distanceText, durationSec }
 
   const socketRef = useRef(null);
 
@@ -60,6 +61,7 @@ const CustomerDashboard = () => {
   const startTracking = (orderId) => {
     setTrackingOrderId(orderId);
     setLiveLocation(null);
+    setEtaInfo(null);
     socketRef.current?.emit('join_order_room', orderId);
   };
 
@@ -240,17 +242,33 @@ const CustomerDashboard = () => {
                                 </h4>
                                 
                                 {liveLocation ? (
-                                  <div style={{ height: '350px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: '2px solid #FFD700', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}>
-                                    <MapView
-                                      center={{ lat: liveLocation.lat, lng: liveLocation.lng }}
-                                      zoom={16}
-                                      markers={[{
-                                        position: { lat: liveLocation.lat, lng: liveLocation.lng },
-                                        emoji: '🚗',
-                                        popup: 'Your Kidza Driver is here!'
-                                      }]}
-                                    />
-                                  </div>
+                                  <>
+                                    {etaInfo && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '12px', marginBottom: '12px', backgroundColor: '#FFFBEB', borderRadius: '12px', border: '1px solid #FDE68A' }}>
+                                        <div style={{ textAlign: 'center' }}>
+                                          <div style={{ fontSize: '0.75rem', color: '#92400E', textTransform: 'uppercase', fontWeight: '700' }}>ETA</div>
+                                          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#111827' }}>{etaInfo.durationText}</div>
+                                        </div>
+                                        <div style={{ textAlign: 'center' }}>
+                                          <div style={{ fontSize: '0.75rem', color: '#92400E', textTransform: 'uppercase', fontWeight: '700' }}>Distance</div>
+                                          <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#111827' }}>{etaInfo.distanceText}</div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    <div style={{ height: '350px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: '2px solid #FFD700', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}>
+                                      <MapView
+                                        center={{ lat: liveLocation.lat, lng: liveLocation.lng }}
+                                        zoom={14}
+                                        markers={[
+                                          { position: { lat: liveLocation.lat, lng: liveLocation.lng }, emoji: '🚗', popup: 'Your Kidza Driver' },
+                                          ...(order.dropoffLat && order.dropoffLng ? [{ position: { lat: order.dropoffLat, lng: order.dropoffLng }, emoji: '🏠', popup: 'Your delivery address' }] : [])
+                                        ]}
+                                        routeFrom={liveLocation}
+                                        routeTo={order.dropoffLat && order.dropoffLng ? { lat: order.dropoffLat, lng: order.dropoffLng } : undefined}
+                                        onRouteUpdate={setEtaInfo}
+                                      />
+                                    </div>
+                                  </>
                                 ) : (
                                   <div style={{ padding: '30px', backgroundColor: '#F3F4F6', borderRadius: '12px', textAlign: 'center', color: '#6B7280', fontStyle: 'italic' }}>
                                     📡 Waiting for driver's GPS signal...
