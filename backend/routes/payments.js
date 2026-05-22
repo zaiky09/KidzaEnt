@@ -86,15 +86,50 @@ router.post('/callback', async (req, res) => {
     res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
 
     if (sendReceipt) {
-      const populated = await Order.findById(order._id)
+      // Fire-and-forget — payment already saved, receipt is best-effort.
+      // Errors logged so they're visible in Render logs; not awaited so we
+      // don't make Safaricom wait on SMTP.
+      Order.findById(order._id)
         .populate('items.item', 'name price')
-        .populate('customerId', 'username email');
-      sendReceiptEmail(populated); // intentionally not awaited
+        .populate('customerId', 'username email')
+        .then((populated) => sendReceiptEmail(populated))
+        .catch((err) => console.error('[receipt] auto-send failed:', err.message, err.stack));
     }
   } catch (err) {
     console.error('Daraja callback handler error:', err);
     // Still 200 — anything else triggers retries.
     res.json({ ResultCode: 0, ResultDesc: 'Accepted (error logged)' });
+  }
+});
+
+// 4. Resend the receipt for a paid order. Useful when the original email
+// went to spam or never sent (best-effort failure on first try). Either
+// the order's owner or any admin can trigger.
+router.post('/:orderId/receipt/resend', verifyToken, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.orderId)
+      .populate('items.item', 'name price')
+      .populate('customerId', 'username email');
+    if (!order) return res.status(404).json({ message: 'Order not found.' });
+
+    const isOwner = order.customerId?._id?.toString() === req.user.userId;
+    if (!isOwner && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not your order.' });
+    }
+    if (order.paymentStatus !== 'completed') {
+      return res.status(400).json({ message: 'Receipts are only sent for completed payments.' });
+    }
+    if (!order.customerId?.email) {
+      return res.status(400).json({ message: 'No email on file for this customer.' });
+    }
+
+    // Await this one so we surface email errors to the user instead of
+    // swallowing them like the post-callback path does.
+    await sendReceiptEmail(order);
+    res.json({ message: `Receipt resent to ${order.customerId.email}.` });
+  } catch (err) {
+    console.error('Resend receipt error:', err);
+    res.status(500).json({ message: err.message || 'Failed to send receipt.' });
   }
 });
 

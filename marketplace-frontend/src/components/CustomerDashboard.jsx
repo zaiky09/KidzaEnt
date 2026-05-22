@@ -72,6 +72,15 @@ const CustomerDashboard = () => {
     }
   };
 
+  const handleResendReceipt = async (orderId) => {
+    try {
+      const res = await api.post(`/api/payments/${orderId}/receipt/resend`);
+      alert(res.data?.message || 'Receipt sent. Check your email (and spam folder).');
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Could not send receipt. Please try again.');
+    }
+  };
+
 
   const submitReview = async ({ rating, comment }) => {
     if (!reviewingItem) return;
@@ -195,6 +204,14 @@ const CustomerDashboard = () => {
                           <span style={{ fontWeight: '600', color: '#374151' }}>Grand Total</span>
                           <span style={{ fontSize: '1.2rem', fontWeight: '700', color: '#10B981' }}>KES {order.totalPrice ? order.totalPrice.toFixed(2) : '0.00'}</span>
                         </div>
+                        {order.paymentStatus === 'completed' && (
+                          <div style={{ marginTop: '10px', textAlign: 'right' }}>
+                            <button
+                              onClick={() => handleResendReceipt(order._id)}
+                              style={{ background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.82rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                            >📧 Email me my receipt</button>
+                          </div>
+                        )}
                       </div>
 
 
