@@ -3,6 +3,12 @@
 
 require('dotenv').config();
 
+// Force DNS to prefer IPv4. Node 18+ defaults to 'ipv6first', but Render's
+// free tier doesn't route outbound IPv6, so connections to Gmail SMTP /
+// Atlas / etc. that resolve to v6 fail with ENETUNREACH. This applies
+// process-wide before any module makes a DNS lookup.
+require('node:dns').setDefaultResultOrder('ipv4first');
+
 // Fail fast if required secrets are missing — never fall back to a hardcoded default.
 const REQUIRED_ENV = ['JWT_SECRET', 'MONGO_URI'];
 for (const key of REQUIRED_ENV) {
