@@ -51,6 +51,7 @@ app.use('/api/catalog', require('./routes/catalog'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/ai', aiLimiter, require('./routes/ai'));
+app.use('/api/payments', require('./routes/payments'));
 
 app.get('/', (req, res) => res.send('Welcome to the Marketplace API!'));
 

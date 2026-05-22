@@ -1,11 +1,14 @@
-// ==========================================
 // File: src/components/CartPage.jsx
-// Purpose: Premium Styled Cart with GPS & Simulated M-Pesa
-// ==========================================
-import { useContext, useState } from 'react';
+// Cart + GPS + real M-Pesa STK push checkout.
+import { useContext, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { CartContext } from '../context/CartContext';
+
+// How long to keep polling for the STK-push outcome before showing a timeout
+// message. Daraja typically resolves in 5-20s; we go a bit higher to be safe.
+const POLL_INTERVAL_MS = 2000;
+const POLL_TIMEOUT_MS = 90_000;
 
 
 const CartPage = () => {
@@ -21,12 +24,20 @@ const CartPage = () => {
   const [dropoffLng, setDropoffLng] = useState(null);
   const [locationStatus, setLocationStatus] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('mpesa_upfront');
-  const [paymentStep, setPaymentStep] = useState('idle'); // idle, pushing, success
+  const [paymentStep, setPaymentStep] = useState('idle'); // idle | pushing | success | failed
+  const [paymentMessage, setPaymentMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Track the poll timer so we can clear it on unmount or on success.
+  const pollTimerRef = useRef(null);
 
   const navigate = useNavigate();
   const grandTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+
+  // Cancel any pending poll if the user navigates away mid-checkout.
+  useEffect(() => () => {
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+  }, []);
 
 
   const handleGetLocation = () => {
@@ -45,11 +56,8 @@ const CartPage = () => {
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
-
-
-    if (!token) {
-      alert("Please log in to check out.");
+    if (!localStorage.getItem('token')) {
+      alert('Please log in to check out.');
       navigate('/login');
       return;
     }
@@ -58,27 +66,14 @@ const CartPage = () => {
       return;
     }
 
-
-    // SIMULATE M-PESA STK PUSH
-    if (paymentMethod === 'mpesa_upfront') {
-      setPaymentStep('pushing');
-      setTimeout(() => {
-        setPaymentStep('success');
-        submitOrderToBackend('completed');
-      }, 3000); // 3 second delay to simulate typing M-Pesa PIN
-    } else {
-      submitOrderToBackend('pending');
-    }
-  };
-
-
-  const submitOrderToBackend = async (finalPaymentStatus) => {
     setIsProcessing(true);
+    setPaymentMessage('');
 
     try {
-      const formattedItems = cart.map(cartItem => ({ item: cartItem._id, quantity: Number(cartItem.quantity) }));
-
-      await api.post('/api/orders', {
+      // 1. Always create the order first. paymentStatus starts as 'pending'
+      // regardless of method; STK push (if any) flips it from the server side.
+      const formattedItems = cart.map(c => ({ item: c._id, quantity: Number(c.quantity) }));
+      const orderRes = await api.post('/api/orders', {
         items: formattedItems,
         expectedDeliveryDate: deliveryDate,
         deliveryAddress,
@@ -86,18 +81,63 @@ const CartPage = () => {
         dropoffLat,
         dropoffLng,
         paymentMethod,
-        paymentStatus: finalPaymentStatus
+        paymentStatus: 'pending'
       });
+      const orderId = orderRes.data._id;
 
+      if (paymentMethod !== 'mpesa_upfront') {
+        // Pay-on-delivery: order is placed; we're done.
+        clearCart();
+        navigate('/customer');
+        return;
+      }
 
-      clearCart();
-      navigate('/customer');
-    } catch (error) {
-      console.error(error);
-      alert('Checkout failed. Please try again.');
+      // 2. Fire STK push and start polling for the callback to land.
+      setPaymentStep('pushing');
+      const push = await api.post('/api/payments/stk-push', { orderId, phone: customerPhone });
+      pollForPayment(push.data.checkoutRequestId);
+    } catch (err) {
+      console.error('Checkout failed:', err);
+      setPaymentStep('failed');
+      setPaymentMessage(err.response?.data?.message || 'Checkout failed. Please try again.');
       setIsProcessing(false);
-      setPaymentStep('idle');
     }
+  };
+
+  const pollForPayment = (checkoutRequestId) => {
+    const deadline = Date.now() + POLL_TIMEOUT_MS;
+
+    const tick = async () => {
+      try {
+        const { data } = await api.get(`/api/payments/status/${checkoutRequestId}`);
+
+        if (data.paymentStatus === 'completed') {
+          setPaymentStep('success');
+          setPaymentMessage(`✅ Payment received (${data.receiptNumber || 'confirmed'})`);
+          clearCart();
+          setTimeout(() => navigate('/customer'), 1500);
+          return;
+        }
+        if (data.paymentStatus === 'failed') {
+          setPaymentStep('failed');
+          setPaymentMessage(data.resultDesc || 'Payment was not completed.');
+          setIsProcessing(false);
+          return;
+        }
+        if (Date.now() > deadline) {
+          setPaymentStep('failed');
+          setPaymentMessage('Payment is taking longer than expected. Check your phone, then refresh "My Orders".');
+          setIsProcessing(false);
+          return;
+        }
+        pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS);
+      } catch (err) {
+        console.error('Poll failed:', err);
+        pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS);
+      }
+    };
+
+    pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS);
   };
 
 
@@ -256,11 +296,21 @@ const CartPage = () => {
                 {paymentStep === 'pushing' ? (
                   <div style={{ padding: '16px', backgroundColor: '#10B981', color: 'white', borderRadius: '8px', textAlign: 'center', fontWeight: '700', fontSize: '1rem', animation: 'pulse 1.5s infinite' }}>
                     📲 STK Push sent! Enter M-Pesa PIN on your phone...
+                    <div style={{ fontSize: '0.8rem', fontWeight: 500, marginTop: '6px', opacity: 0.9 }}>Waiting for confirmation — keep this tab open.</div>
                   </div>
                 ) : paymentStep === 'success' ? (
                   <div style={{ padding: '16px', backgroundColor: '#059669', color: 'white', borderRadius: '8px', textAlign: 'center', fontWeight: '700', fontSize: '1rem' }}>
-                    ✅ Payment Received! Finalizing order...
+                    {paymentMessage || '✅ Payment received! Finalizing order...'}
                   </div>
+                ) : paymentStep === 'failed' ? (
+                  <>
+                    <div style={{ padding: '14px', backgroundColor: '#FEE2E2', color: '#B91C1C', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 600 }}>
+                      ❌ {paymentMessage || 'Payment was not completed.'}
+                    </div>
+                    <button type="submit" disabled={isProcessing} className="btn-primary" style={{ width: '100%', padding: '16px', fontSize: '1.1rem', marginTop: '10px' }}>
+                      Try again
+                    </button>
+                  </>
                 ) : (
                   <button type="submit" disabled={isProcessing} className="btn-primary" style={{ width: '100%', padding: '16px', fontSize: '1.1rem' }}>
                     {isProcessing ? 'Processing...' : paymentMethod === 'mpesa_upfront' ? `Pay KES ${grandTotal.toFixed(2)} Securely` : 'Confirm Order'}

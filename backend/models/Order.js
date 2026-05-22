@@ -20,6 +20,14 @@ const orderSchema = new mongoose.Schema({
   dropoffLng: { type: Number, required: true },
   paymentMethod: { type: String, enum: ['mpesa_upfront', 'mpesa_on_delivery'], default: 'mpesa_on_delivery' },
   paymentStatus: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
+
+  // Daraja STK-push correlation fields. Set when we initiate STK push;
+  // mpesaReceiptNumber filled in by Safaricom's callback on success.
+  mpesaCheckoutRequestId: { type: String, index: true },
+  mpesaMerchantRequestId: { type: String },
+  mpesaReceiptNumber: { type: String },
+  mpesaResultDesc: { type: String },
+
   totalPrice: { type: Number, required: true },
   totalWeightKg: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now }
