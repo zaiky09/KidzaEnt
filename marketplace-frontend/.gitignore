@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# vite-plugin-pwa dev-time generated service worker files
+dev-dist
 *.local
 
 # Editor directories and files
