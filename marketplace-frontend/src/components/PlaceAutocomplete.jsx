@@ -2,20 +2,19 @@
 // web component. The legacy google.maps.places.Autocomplete class is not
 // available to GCP projects created after 2025-03-01, so we use this one.
 //
-// The new element is a Custom Element with shadow DOM that draws its own
-// input + suggestion dropdown. We give it a className so it inherits our
-// .input-modern styling; the dropdown panel is styled by Google.
-//
-// Events:
-// - "gmp-select" fires when the user picks a suggestion. We resolve the
-//   Place reference into formattedAddress + location and pass that up.
+// Important: the element is created exactly once (when the Places library
+// loads) and never recreated. If the callbacks were in the useEffect deps,
+// every parent re-render would unmount and remount the element — and since
+// each keystroke fires onTextChange → parent setState → re-render, that
+// would make typing wipe the input. We use refs to read the latest
+// callbacks without making them dependencies.
 
 import { useEffect, useRef } from 'react';
 import { useMapsLibrary } from '@vis.gl/react-google-maps';
 
 const PlaceAutocomplete = ({
-  onPlaceSelected,         // ({ address, lat, lng }) — fired when user picks a suggestion
-  onTextChange,            // (text) — fired as the user types
+  onPlaceSelected,         // ({ address, lat, lng })
+  onTextChange,            // (text)
   placeholder = 'Start typing an address…',
   className = 'input-modern',
   style
@@ -24,11 +23,18 @@ const PlaceAutocomplete = ({
   const elementRef = useRef(null);
   const places = useMapsLibrary('places');
 
+  // Latest-ref pattern: the element binds to these once, but always sees
+  // the current parent callbacks via the ref's `.current`.
+  const onPlaceSelectedRef = useRef(onPlaceSelected);
+  const onTextChangeRef = useRef(onTextChange);
+  onPlaceSelectedRef.current = onPlaceSelected;
+  onTextChangeRef.current = onTextChange;
+
   useEffect(() => {
     if (!places || !containerRef.current) return;
 
-    // PlaceAutocompleteElement uses `includedRegionCodes` (array of ISO
-    // 3166-1 Alpha-2), not the legacy `componentRestrictions.country`.
+    // PlaceAutocompleteElement uses `includedRegionCodes` (ISO 3166-1 Alpha-2),
+    // not the legacy `componentRestrictions.country`.
     const el = new places.PlaceAutocompleteElement({
       includedRegionCodes: ['ke']
     });
@@ -43,21 +49,20 @@ const PlaceAutocomplete = ({
         const place = event.placePrediction.toPlace();
         await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
         const address = place.formattedAddress || place.displayName || '';
-        onPlaceSelected?.({
+        onPlaceSelectedRef.current?.({
           address,
           lat: place.location.lat(),
           lng: place.location.lng()
         });
-        onTextChange?.(address);
+        onTextChangeRef.current?.(address);
       } catch (err) {
         console.error('PlaceAutocomplete select error:', err);
       }
     };
 
-    // The web component bubbles 'input' events from its internal text field.
     const onInput = (event) => {
       const v = event.target?.value ?? '';
-      onTextChange?.(v);
+      onTextChangeRef.current?.(v);
     };
 
     el.addEventListener('gmp-select', onSelect);
@@ -69,7 +74,11 @@ const PlaceAutocomplete = ({
       el.remove();
       elementRef.current = null;
     };
-  }, [places, onPlaceSelected, onTextChange, className, style]);
+    // NOTE: deliberately not depending on the callbacks or className/style —
+    // the element should be created once when the Places lib resolves and
+    // live for the component's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [places]);
 
   return <div ref={containerRef} data-placeholder={placeholder} style={{ width: '100%' }} />;
 };
