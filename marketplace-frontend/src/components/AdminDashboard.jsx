@@ -4,6 +4,7 @@ import api from '../api';
 import EditUserModal from './EditUserModal';
 import PhotoLightbox from './PhotoLightbox';
 import RejectDriverModal from './RejectDriverModal';
+import SettingsPanel from './SettingsPanel';
 import sharedCategories from '../../../shared/categories.json';
 
 const AdminDashboard = () => {
@@ -183,7 +184,7 @@ const AdminDashboard = () => {
 
       {/* TABS */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '40px' }}>
-        {['inventory', 'orders', 'users'].map((tab) => (
+        {['inventory', 'orders', 'users', 'settings'].map((tab) => (
           <button key={tab} onClick={() => { setActiveTab(tab); setMessage(''); }} style={{
             padding: '12px 30px', borderRadius: '30px', border: 'none', cursor: 'pointer', fontWeight: '700',
             backgroundColor: activeTab === tab ? '#111827' : '#FFFFFF',
@@ -276,6 +277,8 @@ const AdminDashboard = () => {
           ))}
         </div>
       )}
+
+      {activeTab === 'settings' && <SettingsPanel />}
 
       <EditUserModal
         key={editingUser?._id || 'closed'}

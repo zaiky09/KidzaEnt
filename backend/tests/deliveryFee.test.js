@@ -1,4 +1,4 @@
-const { computeDeliveryFee, haversineKm, getConfig } = require('../utils/deliveryFee');
+const { computeDeliveryFee, haversineKm, getEnvDefaults } = require('../utils/deliveryFee');
 
 // Reset any test env overrides between cases.
 const ORIGINAL = { ...process.env };
@@ -8,7 +8,7 @@ afterEach(() => {
 
 describe('computeDeliveryFee', () => {
   test('haversine returns ~0 km when origin and destination match', () => {
-    const cfg = getConfig();
+    const cfg = getEnvDefaults();
     const d = haversineKm({ lat: cfg.warehouseLat, lng: cfg.warehouseLng }, { lat: cfg.warehouseLat, lng: cfg.warehouseLng });
     expect(d).toBeCloseTo(0, 5);
   });

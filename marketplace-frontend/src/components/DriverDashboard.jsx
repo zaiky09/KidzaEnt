@@ -23,6 +23,14 @@ const DriverDashboard = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
     socketRef.current = io(API_BASE_URL, { auth: { token } });
+
+    // Pick up admin-side changes (e.g., admin cancels an order) in real time.
+    socketRef.current.on('order_status_updated', (payload) => {
+      setOrders((prev) => prev.map((o) =>
+        o._id === payload.orderId ? { ...o, status: payload.status } : o
+      ));
+    });
+
     return () => {
       if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
       socketRef.current?.disconnect();

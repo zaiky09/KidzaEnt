@@ -31,6 +31,18 @@ const CustomerDashboard = () => {
     socketRef.current = io(API_BASE_URL, { auth: { token } });
     socketRef.current.on('receive_location_update', (location) => setLiveLocation(location));
 
+    // Real-time status updates: when the driver accepts / starts / completes,
+    // or admin cancels, the server emits to the customer's room. Merge the
+    // new state into the existing orders so the badge + driver info refresh
+    // without the customer reloading.
+    socketRef.current.on('order_status_updated', (payload) => {
+      setOrders((prev) => prev.map((o) =>
+        o._id === payload.orderId
+          ? { ...o, status: payload.status, driverId: payload.driverId ?? o.driverId }
+          : o
+      ));
+    });
+
     const fetchOrders = async () => {
       try {
         const response = await api.get('/api/orders');

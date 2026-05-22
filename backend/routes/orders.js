@@ -5,6 +5,33 @@ const CatalogItem = require('../models/CatalogItem');
 const User = require('../models/User');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { computeDeliveryFee } = require('../utils/deliveryFee');
+const { getSettings } = require('../utils/settings');
+
+// Helper: push a status change to the relevant per-user Socket.IO rooms so
+// customers and drivers see the new state without a reload. Populates the
+// driverId field so the customer's dashboard can show the assigned driver's
+// name + phone in real time after acceptance.
+async function broadcastOrderStatus(req, order) {
+  const io = req.app.get('io');
+  if (!io) return;
+  try {
+    const populated = await Order.findById(order._id)
+      .populate('driverId', 'username phone driverDetails')
+      .lean();
+    const payload = {
+      orderId: order._id.toString(),
+      status: order.status,
+      driverId: populated?.driverId || null,
+      updatedAt: Date.now()
+    };
+    io.to(`customer:${order.customerId}`).emit('order_status_updated', payload);
+    if (order.driverId) {
+      io.to(`driver:${order.driverId}`).emit('order_status_updated', payload);
+    }
+  } catch (err) {
+    console.error('broadcastOrderStatus failed (non-fatal):', err.message);
+  }
+}
 
 // Helper: walk a cart of {item, quantity}, resolve CatalogItem docs, return
 // either { itemSubtotal, totalWeight } or { error, missing }.
@@ -54,10 +81,12 @@ router.post('/quote', verifyToken, async (req, res) => {
     const priced = await priceCart(items);
     if (priced.error) return res.status(400).json({ message: priced.error, missing: priced.missing });
 
+    const settings = await getSettings();
     const { distanceKm, deliveryFee, free, source } = computeDeliveryFee({
       dropoffLat, dropoffLng,
       subtotal: priced.itemSubtotal,
-      distanceMeters
+      distanceMeters,
+      config: settings
     });
     res.json({
       itemSubtotal: priced.itemSubtotal,
@@ -91,10 +120,12 @@ router.post('/', verifyToken, async (req, res) => {
 
     // Authoritative server-side fee. Frontend's distanceMeters is just a
     // suggestion; computeDeliveryFee validates it and falls back if needed.
+    const settings = await getSettings();
     const { distanceKm, deliveryFee } = computeDeliveryFee({
       dropoffLat, dropoffLng,
       subtotal: priced.itemSubtotal,
-      distanceMeters
+      distanceMeters,
+      config: settings
     });
 
     const newOrder = new Order({
@@ -219,6 +250,11 @@ router.put('/:id/status', verifyToken, async (req, res) => {
 
     order.status = nextStatus;
     await order.save();
+
+    // Push the change to the customer (always) and assigned driver
+    // (if any) so their dashboards reflect the new state without a reload.
+    await broadcastOrderStatus(req, order);
+
     res.json(order);
   } catch (error) {
     console.error('Update status error:', error);
@@ -239,6 +275,9 @@ router.put('/:id/cancel', verifyToken, async (req, res) => {
 
     order.status = 'cancelled';
     await order.save();
+
+    await broadcastOrderStatus(req, order);
+
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: 'Server error cancelling.' });

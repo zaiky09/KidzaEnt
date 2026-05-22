@@ -28,6 +28,10 @@ const io = new Server(httpServer, {
   }
 });
 
+// Expose `io` to route handlers via `req.app.get('io')` so /api/orders can
+// emit status changes without circular requires.
+app.set('io', io);
+
 // Authenticate every Socket.IO handshake. Without this anyone could
 // subscribe to a customer's live GPS or spoof a driver's location.
 io.use((socket, next) => {
@@ -43,6 +47,18 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   console.log(`A user connected: ${socket.id} (userId=${socket.user.userId}, role=${socket.user.role})`);
+
+  // Auto-join role-scoped rooms so the server can push order status updates
+  // (and any other per-user notifications later) without the client having
+  // to subscribe per-order. Customer sees changes on every one of their
+  // orders without reloading; driver sees admin-side changes to theirs.
+  if (socket.user.role === 'customer') {
+    socket.join(`customer:${socket.user.userId}`);
+  } else if (socket.user.role === 'driver') {
+    socket.join(`driver:${socket.user.userId}`);
+  } else if (socket.user.role === 'admin') {
+    socket.join('admin');
+  }
 
   // Customer joins a "room" to listen for updates on a specific order.
   // Only the order's customer, its assigned driver, or an admin may join.
