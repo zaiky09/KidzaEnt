@@ -1,0 +1,54 @@
+# Render Blueprint for the Kidza backend.
+# https://render.com/docs/blueprint-spec
+#
+# After connecting this repo as a Blueprint in Render, the secret env vars
+# (sync: false) must be filled in via the Render dashboard before the first
+# deploy will succeed. Non-secret values are baked in here.
+
+services:
+  - type: web
+    name: kidzaent-api
+    runtime: node
+    region: frankfurt          # closest free region to Kenya
+    plan: free                 # 750h/month, sleeps after 15 min idle
+    branch: main
+    rootDir: .
+    buildCommand: npm install
+    startCommand: node backend/server.js
+    healthCheckPath: /
+    envVars:
+      # --- Non-secret / safe to commit ---
+      - key: NODE_ENV
+        value: production
+      - key: MPESA_ENV
+        value: sandbox
+      - key: MPESA_SHORTCODE
+        value: '174379'                # shared sandbox paybill, public
+      - key: MPESA_PASSKEY
+        value: bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919
+      - key: EMAIL_SERVICE
+        value: gmail
+      - key: FRONTEND_URL
+        value: https://kidzaent.vercel.app
+      - key: CORS_ORIGIN
+        value: https://kidzaent.vercel.app
+
+      # --- Secrets: set these in the Render dashboard after creating the service ---
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      # MPESA_CALLBACK_URL is filled in *after* the first deploy gives us
+      # the Render URL (e.g. https://kidzaent-api.onrender.com/api/payments/callback)
+      - key: MPESA_CALLBACK_URL
+        sync: false
