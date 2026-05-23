@@ -109,20 +109,33 @@ io.on('connection', (socket) => {
   });
 });
 
-mongoose.connect(process.env.MONGO_URI, {
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-  family: 4
-})
-.then(() => {
-  console.log('Successfully connected to MongoDB 🚀');
-  mongoose.connection.collection('users').dropIndex('emailOrPhone_1')
-    .then(() => console.log('Old index cleanup completed'))
-    .catch(() => console.log('No old index to clean up, moving on.'));
-})
-.catch((err) => {
-  console.error('❌ Error connecting to the database:', err.message);
-});
+// Mongoose only auto-reconnects AFTER a successful first connection. If the
+// initial connect fails (Atlas whitelist not yet propagated, DNS hiccup,
+// etc.), every subsequent query buffers forever and times out. Retry the
+// first connect with exponential-ish backoff so a transient blip at boot
+// doesn't permanently knock the service out.
+async function connectMongoWithRetry(uri, attempt = 1) {
+  try {
+    await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4
+    });
+    console.log('Successfully connected to MongoDB 🚀');
+    try {
+      await mongoose.connection.collection('users').dropIndex('emailOrPhone_1');
+      console.log('Old index cleanup completed');
+    } catch {
+      console.log('No old index to clean up, moving on.');
+    }
+  } catch (err) {
+    const delay = Math.min(30_000, 2_000 * attempt); // cap at 30s
+    console.error(`❌ Mongo connect attempt ${attempt} failed: ${err.message}. Retrying in ${delay / 1000}s...`);
+    setTimeout(() => connectMongoWithRetry(uri, attempt + 1), delay);
+  }
+}
+
+connectMongoWithRetry(process.env.MONGO_URI);
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
