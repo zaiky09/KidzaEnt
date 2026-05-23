@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
-const { getTransporter } = require('../utils/mailer');
+const { sendMail } = require('../utils/mailer');
 
 const router = express.Router();
 
@@ -28,9 +28,7 @@ const validatePassword = (password) => {
 // stored hashed in the DB. A DB leak then cannot be turned into valid resets.
 const hashResetToken = (raw) => crypto.createHash('sha256').update(raw).digest('hex');
 
-// Shared pooled transporter (port 587 + STARTTLS + short timeouts).
-// utils/mailer.js handles the boot-time verify so we don't duplicate logs.
-const transporter = getTransporter();
+// Email goes through utils/mailer.js (Resend HTTPS API).
 
 // 1. Signup Route
 router.post('/signup', async (req, res) => {
@@ -140,9 +138,8 @@ router.post('/forgot-password', async (req, res) => {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const resetUrl = `${frontendUrl}/reset-password/${rawToken}`;
 
-        await transporter.sendMail({
+        await sendMail({
             to: user.email,
-            from: `"Kidza Support" <${process.env.EMAIL_USER}>`,
             subject: 'Kidza - Password Reset Request',
             html: `
                 <h3>Password Reset Request</h3>

@@ -2,12 +2,9 @@ const express = require('express');
 const User = require('../models/User');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 const bcrypt = require('bcryptjs');
-const { getTransporter } = require('../utils/mailer');
+const { sendMail } = require('../utils/mailer');
 
 const router = express.Router();
-
-// Shared pooled mailer (utils/mailer.js).
-const mailer = getTransporter();
 
 // Same regexes the frontend uses, so a tampered/curl request hits the same wall.
 const NATIONAL_ID_RE = /^\d{7,9}$/;
@@ -114,9 +111,8 @@ router.put('/:id/approve', verifyToken, verifyAdmin, async (req, res) => {
            <p>We've reviewed your Kidza driver application and we can't approve it as-is.</p>
            ${reasonBlock}
            <p>Please update your details at <a href="${FRONTEND_URL}/driver">your driver hub</a> and resubmit. Reach out at <a href="mailto:${process.env.EMAIL_USER}">${process.env.EMAIL_USER}</a> if anything is unclear.</p>`;
-      mailer.sendMail({
+      sendMail({
         to: user.email,
-        from: `"Kidza Marketplace" <${process.env.EMAIL_USER}>`,
         subject,
         html
       }).catch((err) => console.error('[driver-approval-email] failed:', err.message));

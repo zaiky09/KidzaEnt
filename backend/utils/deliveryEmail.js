@@ -1,10 +1,8 @@
 // Email sent to the customer when their order is marked 'delivered'.
 // Uses the shared mailer transporter.
 
-const { getTransporter } = require('./mailer');
+const { sendMail } = require('./mailer');
 const { supportFooterHtml } = require('./contact');
-
-const transporter = getTransporter();
 
 /**
  * @param {object} order — Order with `customerId` and `items.item` populated.
@@ -25,9 +23,8 @@ async function sendDeliveryConfirmationEmail(order) {
     })
     .join('');
 
-  const info = await transporter.sendMail({
+  const result = await sendMail({
     to: email,
-    from: `"Kidza Marketplace" <${process.env.EMAIL_USER}>`,
     subject: `Your order ${shortId} has been delivered 🎉`,
     html: `
       <p>Hi ${username},</p>
@@ -47,8 +44,8 @@ async function sendDeliveryConfirmationEmail(order) {
     `
   });
 
-  console.log('[delivery-email] sent to', email, 'for order', shortId, '— smtp accepted:', info.accepted);
-  return info;
+  console.log('[delivery-email] sent to', email, 'for order', shortId, '— resend id:', result?.id);
+  return result;
 }
 
 module.exports = { sendDeliveryConfirmationEmail };

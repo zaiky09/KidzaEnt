@@ -137,6 +137,10 @@ async function connectMongoWithRetry(uri, attempt = 1) {
 
 connectMongoWithRetry(process.env.MONGO_URI);
 
+// One-time check that the email client can be constructed (catches a
+// missing RESEND_API_KEY at boot instead of on first send).
+require('./utils/mailer').verifyConfig();
+
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

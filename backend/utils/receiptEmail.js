@@ -1,11 +1,9 @@
-// Sends a paid-order receipt to the customer. Uses the shared mailer
-// transporter (utils/mailer.js) so we don't open a separate SMTP pool.
+// Sends a paid-order receipt PDF to the customer via the shared mailer
+// (Resend HTTPS API under the hood — see utils/mailer.js).
 
 const { buildReceiptPdf } = require('./receiptPdf');
-const { getTransporter } = require('./mailer');
+const { sendMail } = require('./mailer');
 const { supportFooterHtml } = require('./contact');
-
-const transporter = getTransporter();
 
 /**
  * Generate the PDF receipt for `order` and email it to the customer.
@@ -24,9 +22,8 @@ async function sendReceiptEmail(order) {
   const shortId = '#' + order._id.toString().slice(-6).toUpperCase();
   const pdf = await buildReceiptPdf(order);
 
-  const info = await transporter.sendMail({
+  const result = await sendMail({
     to: email,
-    from: `"Kidza Marketplace" <${process.env.EMAIL_USER}>`,
     subject: `Receipt for order ${shortId}`,
     html: `
       <p>Hi ${username},</p>
@@ -41,8 +38,8 @@ async function sendReceiptEmail(order) {
       { filename: `kidza-receipt-${shortId.replace('#', '')}.pdf`, content: pdf }
     ]
   });
-  console.log('[receipt] sent to', email, 'for order', shortId, '— smtp accepted:', info.accepted);
-  return info;
+  console.log('[receipt] sent to', email, 'for order', shortId, '— resend id:', result?.id);
+  return result;
 }
 
 module.exports = { sendReceiptEmail };
