@@ -3,6 +3,7 @@
 
 const { buildReceiptPdf } = require('./receiptPdf');
 const { getTransporter } = require('./mailer');
+const { supportFooterHtml } = require('./contact');
 
 const transporter = getTransporter();
 
@@ -34,6 +35,7 @@ async function sendReceiptEmail(order) {
       <p><strong>Amount paid:</strong> KES ${(order.totalPrice || 0).toFixed(2)}<br/>
       <strong>M-Pesa receipt:</strong> ${order.mpesaReceiptNumber || '—'}</p>
       <p style="color:#6B7280;font-size:13px;">If you didn't make this order, reply to this email immediately.</p>
+      ${supportFooterHtml()}
     `,
     attachments: [
       { filename: `kidza-receipt-${shortId.replace('#', '')}.pdf`, content: pdf }

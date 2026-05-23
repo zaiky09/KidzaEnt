@@ -3,6 +3,7 @@
 // Purpose: Premium Landing Page with Dynamic Buttons
 // ==========================================
 import { Link } from 'react-router-dom';
+import { SUPPORT_PHONE, SUPPORT_PHONE_DISPLAY, SUPPORT_EMAIL } from '../constants';
 
 
 const HomePage = () => {
@@ -128,15 +129,15 @@ const HomePage = () => {
 
 
       {/* --- CALL TO ACTION FOOTER --- */}
-      <section style={{ backgroundColor: '#FFD700', padding: '60px 20px', textAlign: 'center', marginTop: 'auto' }}>
+      <section style={{ backgroundColor: '#FFD700', padding: '60px 20px', textAlign: 'center' }}>
         <h2 style={{ fontSize: '2rem', fontWeight: '800', color: '#111827', marginBottom: '20px' }}>Ready to get started?</h2>
-        <Link to="/catalog" style={{ 
+        <Link to="/catalog" style={{
           display: 'inline-block',
-          backgroundColor: '#111827', 
-          color: '#FFD700', 
-          padding: '16px 40px', 
-          borderRadius: '8px', 
-          fontWeight: '700', 
+          backgroundColor: '#111827',
+          color: '#FFD700',
+          padding: '16px 40px',
+          borderRadius: '8px',
+          fontWeight: '700',
           fontSize: '1.1rem',
           textDecoration: 'none',
           boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
@@ -144,6 +145,17 @@ const HomePage = () => {
           View the Catalog ➔
         </Link>
       </section>
+
+      {/* --- CONTACT / HELPLINE FOOTER --- */}
+      <footer style={{ backgroundColor: '#111827', color: '#9CA3AF', padding: '32px 20px', textAlign: 'center', marginTop: 'auto' }}>
+        <p style={{ color: '#FFD700', fontWeight: 700, fontSize: '1rem', margin: '0 0 8px 0' }}>Need help? We're a call or email away.</p>
+        <p style={{ margin: '0 0 6px 0', fontSize: '1.05rem' }}>
+          📞 <a href={`tel:${SUPPORT_PHONE}`} style={{ color: '#FFFFFF', textDecoration: 'none', fontWeight: 600 }}>{SUPPORT_PHONE_DISPLAY}</a>
+          {' · '}
+          ✉️ <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: '#FFFFFF', textDecoration: 'none', fontWeight: 600 }}>{SUPPORT_EMAIL}</a>
+        </p>
+        <p style={{ margin: 0, fontSize: '0.8rem', color: '#6B7280' }}>Mon–Sun, 7am–10pm EAT · © Kidza Enterprise Ltd</p>
+      </footer>
 
 
     </div>

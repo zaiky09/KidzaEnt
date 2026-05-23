@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useContext } from 'react';
 import { CartContext } from '../context/CartContext';
 import logo from '../assets/Kidza.png';
+import { SUPPORT_PHONE, SUPPORT_PHONE_DISPLAY } from '../constants';
 
 
 const Navbar = () => {
@@ -119,6 +120,17 @@ const Navbar = () => {
             {role === 'admin' && (
               <Link to="/admin" style={navLinkStyle('/admin')}>⚙️ Admin Panel</Link>
             )}
+
+
+            {/* Helpline — tap-to-call on mobile, copy-able on desktop */}
+            <a
+              href={`tel:${SUPPORT_PHONE}`}
+              title={`Call us at ${SUPPORT_PHONE_DISPLAY}`}
+              className="nav-help-link"
+              style={{ color: '#FFD700', textDecoration: 'none', marginLeft: '12px', fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap' }}
+            >
+              📞 Help
+            </a>
 
 
             {/* Logout Button */}

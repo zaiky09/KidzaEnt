@@ -2,6 +2,7 @@
 // Uses the shared mailer transporter.
 
 const { getTransporter } = require('./mailer');
+const { supportFooterHtml } = require('./contact');
 
 const transporter = getTransporter();
 
@@ -42,6 +43,7 @@ async function sendDeliveryConfirmationEmail(order) {
         Receipt for this order (PDF): sent separately right after payment.<br/>
         M-Pesa receipt: ${order.mpesaReceiptNumber || '—'}
       </p>
+      ${supportFooterHtml()}
     `
   });
 
