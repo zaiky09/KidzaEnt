@@ -21,6 +21,10 @@ function getTransporter() {
     port: 587,
     secure: false,        // STARTTLS on port 587
     requireTLS: true,
+    // Force IPv4. Render's free tier has no outbound IPv6, and
+    // dns.setDefaultResultOrder('ipv4first') doesn't always reach
+    // nodemailer's internal DNS lookup — explicit family is bulletproof.
+    family: 4,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS

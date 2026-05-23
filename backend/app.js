@@ -7,6 +7,13 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+// Behind Render's load balancer / proxy. Trust exactly one proxy hop so
+// req.ip and X-Forwarded-For are honoured correctly — without this,
+// express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and our
+// rate limiting buckets everyone under the LB's address instead of the
+// real client. '1' = trust the immediate upstream proxy.
+app.set('trust proxy', 1);
+
 // Security headers (XSS, clickjacking, mime sniffing, etc.).
 // CSP is configured to allow Leaflet tiles, user-supplied catalog images,
 // inline styles Leaflet injects at runtime, and WebSocket upgrade connections.
