@@ -74,11 +74,25 @@ router.post('/signup', async (req, res) => {
 // 2. Login Route
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password } = req.body || {};
+
+        // Guard against missing fields so .toLowerCase() doesn't throw and
+        // we return a clean 400 the user can act on.
+        if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
+            return res.status(400).json({ message: 'Email and password are required.' });
+        }
+
         // Find by email OR phone
         const user = await User.findOne({ $or: [{ email: email.toLowerCase() }, { phone: email }] });
-        
+
         if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+
+        // Older accounts may have a missing or non-string password field
+        // (e.g. migrated from another system). bcrypt.compare throws on those.
+        if (typeof user.password !== 'string' || !user.password) {
+            console.error(`[login] user ${user._id} has no usable password hash`);
+            return res.status(400).json({ message: 'This account needs a password reset. Use Forgot Password.' });
+        }
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
@@ -96,7 +110,11 @@ router.post('/login', async (req, res) => {
             username: user.username
         });
     } catch (error) {
-        res.status(500).json({ message: 'Server error during login' });
+        console.error('Login error:', error);
+        res.status(500).json({
+            message: 'Server error during login',
+            details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+        });
     }
 });
 
