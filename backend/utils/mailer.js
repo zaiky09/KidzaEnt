@@ -1,44 +1,43 @@
-// Email transport — uses Brevo's transactional email HTTPS API.
+// Email transport. Uses Resend's HTTPS API.
 //
-// Why Brevo: lets us verify a single Gmail sender (kidzaltd@gmail.com)
-// and then send to ANY recipient on the free tier (300/day). Resend
-// requires a verified domain before sending to non-account-holders, and
-// Gmail SMTP was unreliable from Render's free dyno.
+// Free-tier Resend can only send to the account holder's verified address
+// (kidzaltd@gmail.com) until a custom domain is verified. Until then we
+// run with EMAIL_SANDBOX_REDIRECT set, which funnels every outgoing
+// email to that single inbox while preserving the intended recipient in
+// the subject line. Once you verify a domain in Resend:
+//   1. Set RESEND_FROM to your branded address (e.g. hello@kidza.co.ke)
+//   2. Unset EMAIL_SANDBOX_REDIRECT
+// Emails will then route to real recipients normally.
 //
-// Public interface:
-//
+// Public interface — unchanged across providers:
 //   sendMail({
 //     to:           'user@example.com',          // string or string[]
 //     subject:      'Subject line',
 //     html:         '<p>HTML body</p>',
 //     attachments?: [{ filename, content: Buffer }]
 //   })
-//
-// Throws on failure (existing callers expect that).
 
-const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
+const { Resend } = require('resend');
 
-const FROM_NAME = 'Kidza Marketplace';
-const FROM_EMAIL = process.env.BREVO_FROM || process.env.EMAIL_USER || 'kidzaltd@gmail.com';
-const REPLY_TO_EMAIL = process.env.EMAIL_USER || 'kidzaltd@gmail.com';
+const DEFAULT_FROM_NAME = 'Kidza Marketplace';
+const DEFAULT_FROM_ADDRESS = process.env.RESEND_FROM || 'onboarding@resend.dev';
+const REPLY_TO = process.env.EMAIL_USER || 'kidzaltd@gmail.com';
 
-// Sandbox redirect (optional): if set, every outgoing email is funneled
-// to this address with the intended recipient preserved in the subject.
-// Useful while testing; leave unset in normal operation.
+// Sandbox redirect: when set, every email re-targets to this inbox and the
+// intended recipient is preserved in the subject ("[For: orig@x.com] ...").
 const SANDBOX_REDIRECT = process.env.EMAIL_SANDBOX_REDIRECT || null;
 
-function getApiKey() {
-  const key = process.env.BREVO_API_KEY;
+let client = null;
+function getClient() {
+  if (client) return client;
+  const key = process.env.RESEND_API_KEY;
   if (!key) {
-    throw new Error('BREVO_API_KEY is not set on the server');
+    throw new Error('RESEND_API_KEY is not set on the server');
   }
-  return key;
+  client = new Resend(key);
+  return client;
 }
 
-/**
- * Send a transactional email via Brevo.
- * @returns {Promise<{ messageId: string }>}
- */
 async function sendMail({ to, subject, html, attachments }) {
   if (!to || !subject || !html) {
     throw new Error('sendMail requires { to, subject, html }');
@@ -52,55 +51,37 @@ async function sendMail({ to, subject, html, attachments }) {
   }
 
   const payload = {
-    sender: { name: FROM_NAME, email: FROM_EMAIL },
-    to: finalTo.map((email) => ({ email })),
-    replyTo: { email: REPLY_TO_EMAIL },
+    from: `${DEFAULT_FROM_NAME} <${DEFAULT_FROM_ADDRESS}>`,
+    to: finalTo,
+    reply_to: REPLY_TO,
     subject: finalSubject,
-    htmlContent: html
+    html
   };
 
-  // Brevo wants attachments as base64-encoded strings under "attachment".
   if (Array.isArray(attachments) && attachments.length) {
-    payload.attachment = attachments.map((a) => ({
-      name: a.filename,
-      content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : a.content
+    payload.attachments = attachments.map((a) => ({
+      filename: a.filename,
+      content: a.content
     }));
   }
 
-  const res = await fetch(BREVO_API_URL, {
-    method: 'POST',
-    headers: {
-      'api-key': getApiKey(),
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    let detail = body;
-    try { detail = JSON.parse(body); } catch { /* keep as text */ }
-    const err = new Error(`Brevo send failed: ${res.status} ${typeof detail === 'string' ? detail.slice(0, 200) : (detail.message || detail.code || res.statusText)}`);
-    err.brevo = detail;
-    err.status = res.status;
+  const { data, error } = await getClient().emails.send(payload);
+  if (error) {
+    const err = new Error(`Resend send failed: ${error.message || JSON.stringify(error)}`);
+    err.resend = error;
     throw err;
   }
-
-  const data = await res.json();
-  console.log('[mail] sent', data.messageId, '→', to, '·', subject);
+  console.log('[mail] sent', data?.id, '→', to, '·', subject);
   return data;
 }
 
-// One-time check on boot — just confirms the API key is present.
-// We don't pre-flight against Brevo's API to avoid wasting a quota call.
 function verifyConfig() {
   try {
-    getApiKey();
+    getClient();
     if (SANDBOX_REDIRECT) {
-      console.log(`✅ Email Service Ready (Brevo) — SANDBOX: all mail → ${SANDBOX_REDIRECT}`);
+      console.log(`✅ Email Service Ready (Resend) — SANDBOX: all mail → ${SANDBOX_REDIRECT}`);
     } else {
-      console.log(`✅ Email Service Ready (Brevo) — from ${FROM_EMAIL}`);
+      console.log('✅ Email Service Ready (Resend)');
     }
   } catch (err) {
     console.error('❌ Email Service Error:', err.message);
