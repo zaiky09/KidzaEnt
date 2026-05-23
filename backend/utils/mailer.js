@@ -24,6 +24,13 @@ const DEFAULT_FROM_NAME = 'Kidza Marketplace';
 const DEFAULT_FROM_ADDRESS = process.env.RESEND_FROM || 'onboarding@resend.dev';
 const REPLY_TO = process.env.EMAIL_USER || 'kidzaltd@gmail.com';
 
+// Sandbox redirect: if set, every outgoing email gets re-targeted to this
+// inbox and the intended recipient is preserved in the subject. Useful
+// while we're on Resend's free tier and haven't verified a custom domain
+// yet — Resend only lets the account's own email receive sandbox sends.
+// Unset this env var once a verified domain is in place.
+const SANDBOX_REDIRECT = process.env.EMAIL_SANDBOX_REDIRECT || null;
+
 let client = null;
 function getClient() {
   if (client) return client;
@@ -44,11 +51,20 @@ async function sendMail({ to, subject, html, attachments }) {
     throw new Error('sendMail requires { to, subject, html }');
   }
 
+  // Sandbox: redirect to a single inbox, but keep the original recipient
+  // visible in the subject so QA can tell which user the email targeted.
+  let finalTo = Array.isArray(to) ? to : [to];
+  let finalSubject = subject;
+  if (SANDBOX_REDIRECT) {
+    finalSubject = `[For: ${finalTo.join(', ')}] ${subject}`;
+    finalTo = [SANDBOX_REDIRECT];
+  }
+
   const payload = {
     from: `${DEFAULT_FROM_NAME} <${DEFAULT_FROM_ADDRESS}>`,
-    to: Array.isArray(to) ? to : [to],
+    to: finalTo,
     reply_to: REPLY_TO,
-    subject,
+    subject: finalSubject,
     html
   };
 
@@ -77,7 +93,11 @@ async function sendMail({ to, subject, html, attachments }) {
 function verifyConfig() {
   try {
     getClient();
-    console.log('✅ Email Service Ready (Resend)');
+    if (SANDBOX_REDIRECT) {
+      console.log(`✅ Email Service Ready (Resend) — SANDBOX: all mail → ${SANDBOX_REDIRECT}`);
+    } else {
+      console.log('✅ Email Service Ready (Resend)');
+    }
   } catch (err) {
     console.error('❌ Email Service Error:', err.message);
   }
