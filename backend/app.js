@@ -66,4 +66,11 @@ app.use('/api/settings', require('./routes/settings'));
 
 app.get('/', (req, res) => res.send('Welcome to the Marketplace API!'));
 
+// Health probe for UptimeRobot / cron-job.org / any external pinger to hit
+// every few minutes so Render's free dyno doesn't go to sleep. Cheap on
+// purpose — no DB call, no auth, just confirms the process is alive.
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
+});
+
 module.exports = app;
